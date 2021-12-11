@@ -1,3 +1,6 @@
+#ifndef DATASET_H
+#define DATASET_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -11,3 +14,5 @@ typedef struct entry {
 
 void generate_dataset(entry *db, int len, int total_items);
 void print_dataset(entry *db);
+
+#endif /* DATASET_H */

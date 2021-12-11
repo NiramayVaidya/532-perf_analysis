@@ -3,20 +3,75 @@
 
 using namespace std;
 
-entry *db;
+tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int level) {
+	vector<int> indexes;
+	int offset = 0;
+	indexes.push_back(0);
+	for (int i = 0; i < li.size() - 1; i++) {
+		if (li[i][offset] != li[i + 1][offset]) {
+			indexes.push_back(i + 1);
+		}
+	}
+	indexes.push_back(li.size());
 
-vector<int> l1;
-vector<vector<int>> l2;
-vector<set<int>> newdb;
+	vector<vector<int>> li_next;
+	vector<set<int>> litxids_next;
+	for (int i = 0; i < indexes.size() - 1; i++) {
+		for (int j = indexes[i]; j < indexes[i + 1] - 1; j++) {
+			set<int> txids;
+			set_intersection(litxids[j].begin(), litxids[j].end(), litxids[j + 1].begin(), litxids[j + 1].end(), inserter(txids, txids.begin()));
+			if (txids.size() >= THRESHOLD) {
+				vector<int> items;
+				set_union(li[j].begin(), li[j].end(), li[j + 1].begin(), li[j + 1].end(), back_inserter(items));
+				li_next.push_back(items);
+				litxids_next.push_back(txids);
+			}
+		}
+	}
+
+#if INFO
+		cout << "l" << level << " ->" << endl;
+		for (int i = 0; i < li_next.size(); i++) {
+			for (int j = 0; j < li_next[i].size(); j++) {
+				cout << li_next[i][j];
+			}
+			cout << "\t";
+		}
+		cout << endl;
+#endif
+
+#if DEBUG
+		cout << "l" << level << " txids ->" << endl;
+		for (int i = 0; i < litxids_next.size(); i++) {
+			for (int j = 0; j < li_next[i].size(); j++) {
+				cout << li_next[i][j];
+			}
+			cout << " = ";
+			set<int>::iterator it;
+			for (it = litxids_next[i].begin(); it != litxids_next[i].end(); it++) {
+				cout << *it << " ";
+			}
+			cout << endl;
+		}
+#endif
+
+	tuple<vector<vector<int>>, vector<set<int>>> ret;
+	ret = make_tuple(li_next, litxids_next);
+	return ret;
+}
 
 int main() {
-	db = (entry *) malloc(NUM_TX * sizeof(entry));
+	entry *db = (entry *) malloc(NUM_TX * sizeof(entry));
 
 	generate_dataset(db, NUM_TX, NUM_ITEMS);
 
 #if DEBUG
 	print_dataset(db);
 #endif
+
+	vector<string> all_freq_itemsets;
+
+	vector<int> l1;
 
 	/* Computing l1 by checking if occurences of each item across all
 	 * transactions exceed the threshold
@@ -33,6 +88,10 @@ int main() {
 		}
 	}
 
+	for (int i = 0; i < l1.size(); i++) {
+		all_freq_itemsets.push_back(to_string(l1[i]));
+	}
+
 #if INFO
 	cout << "l1 ->" << endl;
 	for (int i = 0; i < l1.size(); i++) {
@@ -40,6 +99,9 @@ int main() {
 	}
 	cout << endl;
 #endif
+
+	vector<vector<int>> l2;
+	vector<set<int>> newdb;
 
 	/* Computing l2 by combining pairs within l1
 	 * Restructuring the dataset to the format -> itemset : txids
@@ -64,6 +126,12 @@ int main() {
 		}
 	}
 
+	for (int i = 0; i < l2.size(); i++) {
+		stringstream items_stream;
+		copy(l2[i].begin(), l2[i].end(), ostream_iterator<int>(items_stream, ""));
+		all_freq_itemsets.push_back(items_stream.str());
+	}
+
 #if INFO
 	cout << "l2 ->" << endl;
 	for (int i = 0; i < l2.size(); i++) {
@@ -84,55 +152,32 @@ int main() {
 	}
 #endif
 
-	/* Logic for l3 computation, needs to be looped for all further li
-	 * computations
+	/* Computing li after l2 for all i up to the permitted level
 	 */
-	if (l2.size() >= 1) {
-		vector<int> indexes;
-		int offset = 0;
-		indexes.push_back(0);
-		for (int i = 0; i < l2.size() - 1; i++) {
-			if (l2[i][offset] != l2[i + 1][offset]) {
-				indexes.push_back(i + 1);
+	vector<vector<int>> li = l2;
+	vector<set<int>> litxids = newdb;
+	for (int i = 3; i <= LEVEL; i++) {
+		if (li.size() >= 1) {
+			tuple<vector<vector<int>>, vector<set<int>>> ret = compute_li(li, litxids, i);
+			li = get<0>(ret);
+			litxids = get<1>(ret);
+			for (int j = 0; j < li.size(); j++) {
+				stringstream items_stream;
+				copy(li[j].begin(), li[j].end(), ostream_iterator<int>(items_stream, ""));
+				all_freq_itemsets.push_back(items_stream.str());
 			}
 		}
-		indexes.push_back(l2.size());
-
-		vector<vector<int>> l3;
-		vector<set<int>> l3txids;
-		for (int i = 0; i < indexes.size() - 1; i++) {
-			for (int j = indexes[i]; j < indexes[i + 1] - 1; j++) {
-				set<int> txids;
-				set_intersection(newdb[j].begin(), newdb[j].end(), newdb[j + 1].begin(), newdb[j + 1].end(), inserter(txids, txids.begin()));
-				if (txids.size() >= THRESHOLD) {
-					vector<int> items;
-					set_union(l2[j].begin(), l2[j].end(), l2[j + 1].begin(), l2[j + 1].end(), back_inserter(items));
-					l3.push_back(items);
-					l3txids.push_back(txids);
-				}
-			}
+		else {
+			break;
 		}
-		
-#if INFO
-		cout << "l3 ->" << endl;
-		for (int i = 0; i < l3.size(); i++) {
-			cout << l3[i][0] << l3[i][1] << l3[i][2]  << "\t";
-		}
-		cout << endl;
-#endif
-
-#if DEBUG
-		cout << "l3 txids ->" << endl;
-		for (int i = 0; i < l3txids.size(); i++) {
-			cout << l3[i][0] << l3[i][1] << l3[i][2] << " = ";
-			set<int>::iterator it;
-			for (it = l3txids[i].begin(); it != l3txids[i].end(); it++) {
-				cout << *it << " ";
-			}
-			cout << endl;
-		}
-#endif
 	}
+
+	int i;
+	cout << "Frequent itemsets ->" << endl;
+	for (i = 0; i < all_freq_itemsets.size() - 1; i++) {
+		cout << all_freq_itemsets[i] << "\t";
+	}
+	cout << all_freq_itemsets[i] << endl;
 
 	return 0;
 }
