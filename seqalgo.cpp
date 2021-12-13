@@ -3,9 +3,15 @@
 
 using namespace std;
 
-tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int level) {
+string output_file = "frequent_itemsets.txt";
+
+tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int level) {
 	vector<int> indexes;
 	int offset = 0;
+	long long time = 0;
+	
+	auto start = std::chrono::high_resolution_clock::now();
+
 	indexes.push_back(0);
 	for (int i = 0; i < li.size() - 1; i++) {
 		if (li[i][offset] != li[i + 1][offset]) {
@@ -28,6 +34,9 @@ tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, 
 			}
 		}
 	}
+	
+	auto elapsed = std::chrono::high_resolution_clock::now() - start;
+	time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
 #if INFO
 		cout << "l" << level << " ->" << endl;
@@ -55,8 +64,8 @@ tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, 
 		}
 #endif
 
-	tuple<vector<vector<int>>, vector<set<int>>> ret;
-	ret = make_tuple(li_next, litxids_next);
+	tuple<vector<vector<int>>, vector<set<int>>, long long> ret;
+	ret = make_tuple(li_next, litxids_next, time);
 	return ret;
 }
 
@@ -70,8 +79,11 @@ int main() {
 #endif
 
 	vector<string> all_freq_itemsets;
+	long long total_time = 0;
 
 	vector<int> l1;
+
+	auto start = std::chrono::high_resolution_clock::now();
 
 	/* Computing l1 by checking if occurences of each item across all
 	 * transactions exceed the threshold
@@ -88,8 +100,11 @@ int main() {
 		}
 	}
 
+	auto elapsed = std::chrono::high_resolution_clock::now() - start;
+	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+
 	for (int i = 0; i < l1.size(); i++) {
-		all_freq_itemsets.push_back(to_string(l1[i]));
+		all_freq_itemsets.push_back("{" + to_string(l1[i]) + "}");
 	}
 
 #if INFO
@@ -102,6 +117,8 @@ int main() {
 
 	vector<vector<int>> l2;
 	vector<set<int>> newdb;
+	
+	start = std::chrono::high_resolution_clock::now();
 
 	/* Computing l2 by combining pairs within l1
 	 * Restructuring the dataset to the format -> itemset : txids
@@ -125,11 +142,14 @@ int main() {
 			}
 		}
 	}
+	
+	elapsed = std::chrono::high_resolution_clock::now() - start;
+	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
 	for (int i = 0; i < l2.size(); i++) {
 		stringstream items_stream;
-		copy(l2[i].begin(), l2[i].end(), ostream_iterator<int>(items_stream, ""));
-		all_freq_itemsets.push_back(items_stream.str());
+		copy(l2[i].begin(), l2[i].end(), ostream_iterator<int>(items_stream, ", "));
+		all_freq_itemsets.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
 	}
 
 #if INFO
@@ -158,13 +178,14 @@ int main() {
 	vector<set<int>> litxids = newdb;
 	for (int i = 3; i <= LEVEL; i++) {
 		if (li.size() >= 1) {
-			tuple<vector<vector<int>>, vector<set<int>>> ret = compute_li(li, litxids, i);
+			tuple<vector<vector<int>>, vector<set<int>>, long long> ret = compute_li(li, litxids, i);
 			li = get<0>(ret);
 			litxids = get<1>(ret);
+			total_time += get<2>(ret);
 			for (int j = 0; j < li.size(); j++) {
 				stringstream items_stream;
-				copy(li[j].begin(), li[j].end(), ostream_iterator<int>(items_stream, ""));
-				all_freq_itemsets.push_back(items_stream.str());
+				copy(li[j].begin(), li[j].end(), ostream_iterator<int>(items_stream, ", "));
+				all_freq_itemsets.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
 			}
 		}
 		else {
@@ -172,12 +193,25 @@ int main() {
 		}
 	}
 
+	fstream out_file;
+	out_file.open(output_file, fstream::out | fstream::trunc);
 	int i;
+#if INFO
 	cout << "Frequent itemsets ->" << endl;
+#endif
 	for (i = 0; i < all_freq_itemsets.size() - 1; i++) {
+#if INFO
 		cout << all_freq_itemsets[i] << "\t";
+#endif
+		out_file << all_freq_itemsets[i] << endl;
 	}
+#if INFO
 	cout << all_freq_itemsets[i] << endl;
+#endif
+	out_file << all_freq_itemsets[i] << endl;
+	out_file.close();
+
+	cout << "Total execution time = " << total_time << " us" << endl;
 
 	return 0;
 }
