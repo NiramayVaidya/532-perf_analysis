@@ -4,17 +4,24 @@
 using namespace std;
 
 string output_file = "frequent_itemsets.txt";
+string output_file_naive = "frequent_itemsets_naive.txt";
 
-tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int level) {
+tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int offset, int level) {
 	vector<int> indexes;
-	int offset = 0;
 	long long time = 0;
 	
 	auto start = std::chrono::high_resolution_clock::now();
 
 	indexes.push_back(0);
 	for (int i = 0; i < li.size() - 1; i++) {
-		if (li[i][offset] != li[i + 1][offset]) {
+		bool all_same = true;
+		for (int j = 0; j <= offset; j++) {
+			if (li[i][j] != li[i + 1][j]) {
+				all_same = false;
+				break;
+			}
+		}
+		if (!all_same) {
 			indexes.push_back(i + 1);
 		}
 	}
@@ -24,13 +31,15 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 	vector<set<int>> litxids_next;
 	for (int i = 0; i < indexes.size() - 1; i++) {
 		for (int j = indexes[i]; j < indexes[i + 1] - 1; j++) {
-			set<int> txids;
-			set_intersection(litxids[j].begin(), litxids[j].end(), litxids[j + 1].begin(), litxids[j + 1].end(), inserter(txids, txids.begin()));
-			if (txids.size() >= THRESHOLD) {
-				vector<int> items;
-				set_union(li[j].begin(), li[j].end(), li[j + 1].begin(), li[j + 1].end(), back_inserter(items));
-				li_next.push_back(items);
-				litxids_next.push_back(txids);
+			for (int k = j + 1; k <= indexes[i + 1] - 1; k++) {
+				set<int> txids;
+				set_intersection(litxids[j].begin(), litxids[j].end(), litxids[k].begin(), litxids[k].end(), inserter(txids, txids.begin()));
+				if (txids.size() >= THRESHOLD) {
+					vector<int> items;
+					set_union(li[j].begin(), li[j].end(), li[k].begin(), li[k].end(), back_inserter(items));
+					li_next.push_back(items);
+					litxids_next.push_back(txids);
+				}
 			}
 		}
 	}
@@ -69,6 +78,74 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 	return ret;
 }
 
+#if NAIVE_METHOD
+tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, int level, int offset, entry *db) {
+	vector<int> indexes;
+	long long time = 0;
+	
+	auto start = std::chrono::high_resolution_clock::now();
+
+	indexes.push_back(0);
+	for (int i = 0; i < li.size() - 1; i++) {
+		bool all_same = true;
+		for (int j = 0; j <= offset; j++) {
+			if (li[i][j] != li[i + 1][j]) {
+				all_same = false;
+				break;
+			}
+		}
+		if (!all_same) {
+			indexes.push_back(i + 1);
+		}
+	}
+	indexes.push_back(li.size());
+
+	vector<vector<int>> li_next;
+	for (int i = 0; i < indexes.size() - 1; i++) {
+		for (int j = indexes[i]; j < indexes[i + 1] - 1; j++) {
+			for (int k = j + 1; k <= indexes[i + 1] - 1; k++) {
+				vector<int> items;
+				set_union(li[j].begin(), li[j].end(), li[k].begin(), li[k].end(), back_inserter(items));
+				int count = 0;
+				for (int l = 0; l < NUM_TX; l++) {
+					bool all_present = true;
+					for (int m = 0; m < items.size(); m++) {
+						if (db[l].item_present[items[m] - 1] != 1) {
+							all_present = false;
+							break;
+						}
+					}
+					if (all_present) {
+						count++;
+					}
+				}
+				if (count >= THRESHOLD) {
+					li_next.push_back(items);
+				}
+			}
+		}
+	}
+	
+	auto elapsed = std::chrono::high_resolution_clock::now() - start;
+	time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+
+#if INFO
+		cout << "l" << level << " ->" << endl;
+		for (int i = 0; i < li_next.size(); i++) {
+			for (int j = 0; j < li_next[i].size(); j++) {
+				cout << li_next[i][j];
+			}
+			cout << "\t";
+		}
+		cout << endl;
+#endif
+
+	tuple<vector<vector<int>>, long long> ret;
+	ret = make_tuple(li_next, time);
+	return ret;
+}
+#endif
+
 int main() {
 	entry *db = (entry *) malloc(NUM_TX * sizeof(entry));
 
@@ -80,6 +157,10 @@ int main() {
 
 	vector<string> all_freq_itemsets;
 	long long total_time = 0;
+#if NAIVE_METHOD
+	vector<string> all_freq_itemsets_naive;
+	long long total_time_naive = 0;
+#endif
 
 	vector<int> l1;
 
@@ -102,9 +183,15 @@ int main() {
 
 	auto elapsed = std::chrono::high_resolution_clock::now() - start;
 	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+#if NAIVE_METHOD
+	total_time_naive += total_time;
+#endif
 
 	for (int i = 0; i < l1.size(); i++) {
 		all_freq_itemsets.push_back("{" + to_string(l1[i]) + "}");
+#if NAIVE_METHOD
+		all_freq_itemsets_naive.push_back("{" + to_string(l1[i]) + "}");
+#endif
 	}
 
 #if INFO
@@ -176,9 +263,10 @@ int main() {
 	 */
 	vector<vector<int>> li = l2;
 	vector<set<int>> litxids = newdb;
+	int offset = 0;
 	for (int i = 3; i <= LEVEL; i++) {
 		if (li.size() >= 1) {
-			tuple<vector<vector<int>>, vector<set<int>>, long long> ret = compute_li(li, litxids, i);
+			tuple<vector<vector<int>>, vector<set<int>>, long long> ret = compute_li(li, litxids, offset, i);
 			li = get<0>(ret);
 			litxids = get<1>(ret);
 			total_time += get<2>(ret);
@@ -187,6 +275,7 @@ int main() {
 				copy(li[j].begin(), li[j].end(), ostream_iterator<int>(items_stream, ", "));
 				all_freq_itemsets.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
 			}
+			offset++;
 		}
 		else {
 			break;
@@ -211,7 +300,91 @@ int main() {
 	out_file << all_freq_itemsets[i] << endl;
 	out_file.close();
 
-	cout << "Total execution time = " << total_time << " us" << endl;
+	cout << "Total execution time (optimal algorithm) = " << total_time << " us" << endl;
+
+#if NAIVE_METHOD
+	vector<vector<int>> l2_naive;
+	
+	start = std::chrono::high_resolution_clock::now();
+
+	/* Computing l2 by combining pairs within l1
+	 * No restructuring of the original dataset required in the naive case
+	 */
+	for (int i = 0; i < l1.size(); i++) {
+		for (int j = i + 1; j < l1.size(); j++) {
+			int count = 0;
+			for (int k = 0; k < NUM_TX; k++) {
+				if (db[k].item_present[l1[i] - 1] == 1 && db[k].item_present[l1[j] - 1] == 1) {
+					count++;
+				}
+			}
+			if (count >= THRESHOLD) {
+				vector<int> items;
+				items.push_back(l1[i]);
+				items.push_back(l1[j]);
+				l2_naive.push_back(items);
+			}
+		}
+	}
+	
+	elapsed = std::chrono::high_resolution_clock::now() - start;
+	total_time_naive += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+
+	for (int i = 0; i < l2_naive.size(); i++) {
+		stringstream items_stream;
+		copy(l2_naive[i].begin(), l2_naive[i].end(), ostream_iterator<int>(items_stream, ", "));
+		all_freq_itemsets_naive.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
+	}
+
+#if INFO
+	cout << "l2 ->" << endl;
+	for (int i = 0; i < l2_naive.size(); i++) {
+		cout << l2_naive[i][0] << l2_naive[i][1] << "\t";
+	}
+	cout << endl;
+#endif
+
+	/* Computing li after l2 for all i up to the permitted level
+	 * Always use the original dataset
+	 */
+	vector<vector<int>> li_naive = l2_naive;
+	offset = 0;
+	for (int i = 3; i <= LEVEL; i++) {
+		if (li_naive.size() >= 1) {
+			tuple<vector<vector<int>>, long long> ret = compute_li_naive(li_naive, i, offset, db);
+			li_naive = get<0>(ret);
+			total_time_naive += get<1>(ret);
+			for (int j = 0; j < li_naive.size(); j++) {
+				stringstream items_stream;
+				copy(li_naive[j].begin(), li_naive[j].end(), ostream_iterator<int>(items_stream, ", "));
+				all_freq_itemsets_naive.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
+			}
+			offset++;
+		}
+		else {
+			break;
+		}
+	}
+	
+	fstream out_file_naive;
+	out_file_naive.open(output_file_naive, fstream::out | fstream::trunc);
+#if INFO
+	cout << "Frequent itemsets ->" << endl;
+#endif
+	for (i = 0; i < all_freq_itemsets_naive.size() - 1; i++) {
+#if INFO
+		cout << all_freq_itemsets_naive[i] << "\t";
+#endif
+		out_file_naive << all_freq_itemsets_naive[i] << endl;
+	}
+#if INFO
+	cout << all_freq_itemsets_naive[i] << endl;
+#endif
+	out_file_naive << all_freq_itemsets_naive[i] << endl;
+	out_file_naive.close();
+
+	cout << "Total execution time (naive algorithm) = " << total_time_naive << " us" << endl;
+#endif
 
 	return 0;
 }

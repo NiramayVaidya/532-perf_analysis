@@ -14,9 +14,11 @@
 #define DEBUG 0
 #define INFO 0
 
-#define NUM_TX 100
-#define NUM_ITEMS 100
-#define THRESHOLD 2
+#define NUM_TX 50
+#define NUM_ITEMS 50
+#define THRESHOLD 10
 #define LEVEL 50
+
+#define NAIVE_METHOD 1
 
 #endif /* SEQALGO_H */
