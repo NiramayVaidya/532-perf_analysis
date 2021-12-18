@@ -25,9 +25,6 @@ pthread_mutex_t lock;
 
 tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int offset, int level) {
 	vector<int> indexes;
-	// long long time = 0;
-
-	// auto start = std::chrono::high_resolution_clock::now();
 
 	indexes.push_back(0);
 	for (int i = 0; i < li.size() - 1; i++) {
@@ -61,9 +58,6 @@ tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, 
 		}
 	}
 
-	// auto elapsed = std::chrono::high_resolution_clock::now() - start;
-	// time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-
 #if INFO
 	cout << "l" << level << " ->" << endl;
 	cout << "Count = " << li_next.size() << endl;
@@ -77,6 +71,8 @@ tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, 
 	}
 	cout << endl;
 #endif
+
+	// cout << "l" << level << " computation done" << endl;
 
 #if DEBUG
 	cout << "l" << level << " txids ->" << endl;
@@ -101,9 +97,6 @@ tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, 
 #if NAIVE_METHOD
 vector<vector<int>> compute_li_naive(vector<vector<int>> li, int offset, int level) {
 	vector<int> indexes;
-	// long long time = 0;
-
-	// auto start = std::chrono::high_resolution_clock::now();
 
 	indexes.push_back(0);
 	for (int i = 0; i < li.size() - 1; i++) {
@@ -146,9 +139,6 @@ vector<vector<int>> compute_li_naive(vector<vector<int>> li, int offset, int lev
 		}
 	}
 
-	// auto elapsed = std::chrono::high_resolution_clock::now() - start;
-	// time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-
 #if INFO
 	cout << "l" << level << " ->" << endl;
 	cout << "Count = " << li_next.size() << endl;
@@ -163,22 +153,17 @@ vector<vector<int>> compute_li_naive(vector<vector<int>> li, int offset, int lev
 	cout << endl;
 #endif
 
+	// cout << "l" << level << " computation done" << endl;
+
 	return li_next;
 }
 #endif
 
-// void *launch_compute(void *eci) {
 void *launch_compute(void *pos) {
-	// int start = ((equivalence_class_indexes *)eci)->start;
-	// int end = ((equivalence_class_indexes *)eci)->end;
-	// int offset = ((equivalence_class_indexes *)eci)->offset;
 	long i = (long) pos;
 	int start = ecis[i].start;
 	int end = ecis[i].end;
 	int offset = ecis[i].offset;
-
-	cout << "In thread: " << &ecis[i] << endl;
-	cout << "In thread: start index = " << start << ", end index = " << end << endl;
 
 	// pthread_mutex_lock(&lock);
 	if (l2.size() >= 1) {
@@ -217,6 +202,8 @@ void *launch_compute(void *pos) {
 		cout << endl;
 #endif
 
+		// cout << "l3 computation done" << endl;
+
 #if DEBUG
 		cout << "l3" << " txids ->" << endl;
 		for (int i = 0; i < l3txids.size(); i++) {
@@ -244,14 +231,6 @@ void *launch_compute(void *pos) {
 				tuple<vector<vector<int>>, vector<set<int>>> ret = compute_li(li, litxids, offset, i);
 				li = get<0>(ret);
 				litxids = get<1>(ret);
-				// total_time += get<2>(ret);
-				/*
-				for (int j = 0; j < li.size(); j++) {
-					stringstream items_stream;
-					copy(li[j].begin(), li[j].end(), ostream_iterator<int>(items_stream, ", "));
-					all_freq_itemsets.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
-				}
-				*/
 				pthread_mutex_lock(&lock);
 				all_freq_itemsets.insert(all_freq_itemsets.end(), li.begin(), li.end());
 				pthread_mutex_unlock(&lock);
@@ -269,15 +248,10 @@ void *launch_compute(void *pos) {
 
 #if NAIVE_METHOD
 void *launch_compute_naive(void *pos) {
-	// int start = ((equivalence_class_indexes *)eci)->start;
-	// int end = ((equivalence_class_indexes *)eci)->end;
-	// int offset = ((equivalence_class_indexes *)eci)->offset;
 	long i = (long) pos;
 	int start = ecis[i].start;
 	int end = ecis[i].end;
 	int offset = ecis[i].offset;
-
-	cout << "In thread: start index = " << start << ", end index = " << end << endl;
 
 	// pthread_mutex_lock(&lock);
 	if (l2.size() >= 1) {
@@ -307,25 +281,6 @@ void *launch_compute_naive(void *pos) {
 			}
 		}
 
-		/*
-		for (int j = start; j < end - 1; j++) {
-			for (int k = j + 1; k <= end - 1; k++) {
-				set<int> txids;
-				// pthread_mutex_lock(&lock);
-				set_intersection(newdb[j].begin(), newdb[j].end(), newdb[k].begin(), newdb[k].end(), inserter(txids, txids.begin()));
-				// pthread_mutex_unlock(&lock);
-				if (txids.size() >= THRESHOLD) {
-					vector<int> items;
-					// pthread_mutex_lock(&lock);
-					set_union(l2[j].begin(), l2[j].end(), l2[k].begin(), l2[k].end(), back_inserter(items));
-					// pthread_mutex_unlock(&lock);
-					l3.push_back(items);
-					l3txids.push_back(txids);
-				}
-			}
-		}
-		*/
-
 #if INFO
 		cout << "l3" << " ->" << endl;
 		cout << "Count = " << l3.size() << endl;
@@ -340,22 +295,7 @@ void *launch_compute_naive(void *pos) {
 		cout << endl;
 #endif
 
-/*
-#if DEBUG
-		cout << "l3" << " txids ->" << endl;
-		for (int i = 0; i < l3txids.size(); i++) {
-			for (int j = 0; j < l3[i].size(); j++) {
-				cout << l3[i][j] << " ";
-			}
-			cout << "= ";
-			set<int>::iterator it;
-			for (it = l3txids[i].begin(); it != l3txids[i].end(); it++) {
-				cout << *it << " ";
-			}
-			cout << endl;
-		}
-#endif
-*/
+		// cout << "l3 computation done" << endl;
 
 		pthread_mutex_lock(&lock);
 		all_freq_itemsets_naive.insert(all_freq_itemsets_naive.end(), l3.begin(), l3.end());
@@ -365,17 +305,7 @@ void *launch_compute_naive(void *pos) {
 		vector<vector<int>> li = l3;
 		for (int i = 4; i <= LEVEL; i++) {
 			if (li.size() >= 1) {
-				cout << "li size = " << li.size() << endl;
 				li = compute_li_naive(li, offset, i);
-				// litxids = get<1>(ret);
-				// total_time += get<2>(ret);
-				/*
-				for (int j = 0; j < li.size(); j++) {
-					stringstream items_stream;
-					copy(li[j].begin(), li[j].end(), ostream_iterator<int>(items_stream, ", "));
-					all_freq_itemsets.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
-				}
-				*/
 				pthread_mutex_lock(&lock);
 				all_freq_itemsets_naive.insert(all_freq_itemsets_naive.end(), li.begin(), li.end());
 				pthread_mutex_unlock(&lock);
@@ -386,7 +316,6 @@ void *launch_compute_naive(void *pos) {
 			}
 		}
 	}
-	// pthread_mutex_unlock(&lock);
 
 	return NULL;
 }
@@ -427,12 +356,10 @@ int main() {
 #endif
 
 	for (int i = 0; i < l1.size(); i++) {
-		// all_freq_itemsets.push_back("{" + to_string(l1[i]) + "}");
 		vector<int> l1single;
 		l1single.push_back(l1[i]);
 		all_freq_itemsets.push_back(l1single);
 #if NAIVE_METHOD
-		// all_freq_itemsets_naive.push_back("{" + to_string(l1[i]) + "}");
 		all_freq_itemsets_naive.push_back(l1single);
 #endif
 	}
@@ -445,6 +372,8 @@ int main() {
 	}
 	cout << endl;
 #endif
+
+	// cout << "l1 computation done" << endl;
 
 	start = std::chrono::high_resolution_clock::now();
 
@@ -474,13 +403,6 @@ int main() {
 	elapsed = std::chrono::high_resolution_clock::now() - start;
 	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
-	/*
-	for (int i = 0; i < l2.size(); i++) {
-		stringstream items_stream;
-		copy(l2[i].begin(), l2[i].end(), ostream_iterator<int>(items_stream, ", "));
-		all_freq_itemsets.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
-	}
-	*/
 	all_freq_itemsets.insert(all_freq_itemsets.end(), l2.begin(), l2.end());
 
 #if INFO
@@ -491,6 +413,8 @@ int main() {
 	}
 	cout << endl;
 #endif
+
+	// cout << "l2 computation done" << endl;
 
 #if DEBUG
 	cout << "Reformed dataset ->" << endl;
@@ -528,7 +452,6 @@ int main() {
 	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
 	vector<pthread_t> tids(indexes.size() - 1);
-	// vector<equivalence_class_indexes> ecis(indexes.size() - 1);
 
 	pthread_mutex_init(&lock, NULL);
 
@@ -547,17 +470,9 @@ int main() {
 	}
 
 	for (int i = 0; i < tids.size(); i++) {
-		// equivalence_class_indexes eci;
-		// eci.start = indexes[i];
-		// eci.end = indexes[i + 1];
-		// eci.offset = offset;
-		// ecis.push_back(eci);
 #if DEBUG
 		cout << "Start index = " << ecis[i].start << ", end index = " << ecis[i].end << endl;
 #endif
-		// cout << &eci << " " << &ecis[i] << endl;
-		cout << "In main: " << &ecis[i] << endl;
-		// pthread_create(&tids[i], NULL, launch_compute, (void *) &ecis[i]);
 		long pos = (long) i;
 		pthread_create(&tids[i], NULL, launch_compute, (void *) pos);
 	}
@@ -570,31 +485,6 @@ int main() {
 	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
 	pthread_mutex_destroy(&lock);
-
-	/* Computing li after l2 for all i up to the permitted level
-	 */
-	/*
-	vector<vector<int>> li = l2;
-	vector<set<int>> litxids = newdb;
-	int offset = 0;
-	for (int i = 3; i <= LEVEL; i++) {
-		if (li.size() >= 1) {
-			tuple<vector<vector<int>>, vector<set<int>>, long long> ret = compute_li(li, litxids, offset, i);
-			li = get<0>(ret);
-			litxids = get<1>(ret);
-			total_time += get<2>(ret);
-			for (int j = 0; j < li.size(); j++) {
-				stringstream items_stream;
-				copy(li[j].begin(), li[j].end(), ostream_iterator<int>(items_stream, ", "));
-				all_freq_itemsets.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
-			}
-			offset++;
-		}
-		else {
-			break;
-		}
-	}
-	*/
 
 	fstream out_file;
 	out_file.open(output_file, fstream::out | fstream::trunc);
@@ -653,13 +543,6 @@ int main() {
 	elapsed = std::chrono::high_resolution_clock::now() - start;
 	total_time_naive += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
-	/*
-	for (int i = 0; i < l2_naive.size(); i++) {
-		stringstream items_stream;
-		copy(l2_naive[i].begin(), l2_naive[i].end(), ostream_iterator<int>(items_stream, ", "));
-		all_freq_itemsets_naive.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
-	}
-	*/
 	all_freq_itemsets_naive.insert(all_freq_itemsets_naive.end(), l2.begin(), l2.end());
 
 #if INFO
@@ -730,30 +613,6 @@ int main() {
 
 	pthread_mutex_destroy(&lock);
 
-	/* Computing li after l2 for all i up to the permitted level
-	 * Always use the original dataset
-	 */
-	/*
-	vector<vector<int>> li_naive = l2_naive;
-	offset = 0;
-	for (int i = 3; i <= LEVEL; i++) {
-		if (li_naive.size() >= 1) {
-			tuple<vector<vector<int>>, long long> ret = compute_li_naive(li_naive, i, offset, db);
-			li_naive = get<0>(ret);
-			total_time_naive += get<1>(ret);
-			for (int j = 0; j < li_naive.size(); j++) {
-				stringstream items_stream;
-				copy(li_naive[j].begin(), li_naive[j].end(), ostream_iterator<int>(items_stream, ", "));
-				all_freq_itemsets_naive.push_back("{" + items_stream.str().substr(0, items_stream.str().size() - 2) + "}");
-			}
-			offset++;
-		}
-		else {
-			break;
-		}
-	}
-	*/
-	
 	fstream out_file_naive;
 	out_file_naive.open(output_file_naive, fstream::out | fstream::trunc);
 #if INFO
@@ -770,12 +629,12 @@ int main() {
 #if INFO
 			cout << all_freq_itemsets_naive[i][j] << ", ";
 #endif
-			out_file << all_freq_itemsets_naive[i][j] << ", ";
+			out_file_naive << all_freq_itemsets_naive[i][j] << ", ";
 		}
 #if INFO
 		cout << all_freq_itemsets_naive[i][j] << "}\t";
 #endif
-		out_file << all_freq_itemsets_naive[i][j] << "}" << endl;
+		out_file_naive << all_freq_itemsets_naive[i][j] << "}" << endl;
 	}
 #if INFO
 	cout << endl;
@@ -783,26 +642,6 @@ int main() {
 
 	cout << "Total parallel execution time (naive algorithm) = " << total_time_naive << " us" << endl;
 
-	/*
-	fstream out_file_naive;
-	out_file_naive.open(output_file_naive, fstream::out | fstream::trunc);
-#if INFO
-	cout << "Frequent itemsets ->" << endl;
-#endif
-	for (i = 0; i < all_freq_itemsets_naive.size() - 1; i++) {
-#if INFO
-		cout << all_freq_itemsets_naive[i] << "\t";
-#endif
-		out_file_naive << all_freq_itemsets_naive[i] << endl;
-	}
-#if INFO
-	cout << all_freq_itemsets_naive[i] << endl;
-#endif
-	out_file_naive << all_freq_itemsets_naive[i] << endl;
-	out_file_naive.close();
-
-	cout << "Total execution time (naive algorithm) = " << total_time_naive << " us" << endl;
-	*/
 #endif
 
 	return 0;

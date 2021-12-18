@@ -11,13 +11,13 @@
 #include <fstream>
 #include <chrono>
 
-#define DEBUG 1
-#define INFO 1
+#define DEBUG 0
+#define INFO 0
 
-#define NUM_TX 5
-#define NUM_ITEMS 5
-#define THRESHOLD 1
-#define LEVEL 5
+#define NUM_TX 100
+#define NUM_ITEMS 100
+#define THRESHOLD 10
+#define LEVEL 100
 
 #define NAIVE_METHOD 1
 
