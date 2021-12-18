@@ -1,29 +1,28 @@
-#include "dataset.h"
 #include "pthreadsalgo.h"
 
 using namespace std;
 
-entry *db;
+static entry *db;
 
-vector<vector<int>> all_freq_itemsets;
+static vector<vector<int>> all_freq_itemsets;
 long long total_time = 0;
 
 #if NAIVE_METHOD
-vector<vector<int>> all_freq_itemsets_naive;
-long long total_time_naive = 0;
+static vector<vector<int>> all_freq_itemsets_naive;
+static long long total_time_naive = 0;
 #endif
 
-vector<vector<int>> l2;
-vector<set<int>> newdb;
+static vector<vector<int>> l2;
+static vector<set<int>> newdb;
 
-vector<equivalence_class_indexes> ecis;
+static vector<equivalence_class_indexes> ecis;
 
-string output_file = "frequent_itemsets_pthreads.txt";
-string output_file_naive = "frequent_itemsets_naive_pthreads.txt";
+static string output_file = "frequent_itemsets_pthreads.txt";
+static string output_file_naive = "frequent_itemsets_naive_pthreads.txt";
 
-pthread_mutex_t lock;
+static pthread_mutex_t lock;
 
-tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int offset, int level) {
+static tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int offset, int level) {
 	vector<int> indexes;
 
 	indexes.push_back(0);
@@ -95,7 +94,7 @@ tuple<vector<vector<int>>, vector<set<int>>> compute_li(vector<vector<int>> li, 
 }
 
 #if NAIVE_METHOD
-vector<vector<int>> compute_li_naive(vector<vector<int>> li, int offset, int level) {
+static vector<vector<int>> compute_li_naive(vector<vector<int>> li, int offset, int level) {
 	vector<int> indexes;
 
 	indexes.push_back(0);
@@ -159,7 +158,7 @@ vector<vector<int>> compute_li_naive(vector<vector<int>> li, int offset, int lev
 }
 #endif
 
-void *launch_compute(void *pos) {
+static void *launch_compute(void *pos) {
 	long i = (long) pos;
 	int start = ecis[i].start;
 	int end = ecis[i].end;
@@ -247,7 +246,7 @@ void *launch_compute(void *pos) {
 }
 
 #if NAIVE_METHOD
-void *launch_compute_naive(void *pos) {
+static void *launch_compute_naive(void *pos) {
 	long i = (long) pos;
 	int start = ecis[i].start;
 	int end = ecis[i].end;
@@ -321,14 +320,9 @@ void *launch_compute_naive(void *pos) {
 }
 #endif
 
-int main() {
-	db = (entry *) malloc(NUM_TX * sizeof(entry));
-
-	generate_dataset(db, NUM_TX, NUM_ITEMS);
-
-#if DEBUG
-	print_dataset(db);
-#endif
+void pthreadsalgo_run(entry *dataset) {
+	// db = (entry *) malloc(NUM_TX * sizeof(entry));
+	db = dataset;
 
 	vector<int> l1;
 
@@ -512,6 +506,7 @@ int main() {
 #if INFO
 	cout << endl;
 #endif
+	out_file.close();
 
 	cout << "Total parallel execution time (optimal algorithm) = " << total_time << " us" << endl;
 
@@ -639,10 +634,11 @@ int main() {
 #if INFO
 	cout << endl;
 #endif
+	out_file_naive.close();
 
 	cout << "Total parallel execution time (naive algorithm) = " << total_time_naive << " us" << endl;
 
 #endif
 
-	return 0;
+	// free(db);
 }

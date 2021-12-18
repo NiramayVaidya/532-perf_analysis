@@ -1,12 +1,11 @@
-#include "dataset.h"
 #include "seqalgo.h"
 
 using namespace std;
 
-string output_file = "frequent_itemsets.txt";
-string output_file_naive = "frequent_itemsets_naive.txt";
+static string output_file = "frequent_itemsets.txt";
+static string output_file_naive = "frequent_itemsets_naive.txt";
 
-tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int offset, int level) {
+static tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int offset, int level) {
 	vector<int> indexes;
 	long long time = 0;
 
@@ -84,7 +83,7 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 }
 
 #if NAIVE_METHOD
-tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, int offset, int level, entry *db) {
+static tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, int offset, int level, entry *db) {
 	vector<int> indexes;
 	long long time = 0;
 
@@ -156,14 +155,8 @@ tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, i
 }
 #endif
 
-int main() {
-	entry *db = (entry *) malloc(NUM_TX * sizeof(entry));
-
-	generate_dataset(db, NUM_TX, NUM_ITEMS);
-
-#if DEBUG
-	print_dataset(db);
-#endif
+void seqalgo_run(entry *db) {
+	// entry *db = (entry *) malloc(NUM_TX * sizeof(entry));
 
 	vector<string> all_freq_itemsets;
 	long long total_time = 0;
@@ -404,5 +397,5 @@ int main() {
 	cout << "Total execution time (naive algorithm) = " << total_time_naive << " us" << endl;
 #endif
 
-	return 0;
+	// free(db);
 }

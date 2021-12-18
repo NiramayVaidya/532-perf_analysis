@@ -11,6 +11,13 @@
 #include <fstream>
 #include <chrono>
 
+#include "dataset.h"
+
+#ifndef FLAGS
+#define FLAGS 1
+#endif
+
+#if FLAGS
 #define DEBUG 0
 #define INFO 0
 
@@ -20,5 +27,8 @@
 #define LEVEL 100
 
 #define NAIVE_METHOD 1
+#endif
+
+void seqalgo_run(entry *db);
 
 #endif /* SEQALGO_H */

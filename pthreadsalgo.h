@@ -13,6 +13,13 @@
 #include <fstream>
 #include <chrono>
 
+#include "dataset.h"
+
+#ifndef FLAGS
+#define FLAGS 1
+#endif
+
+#if FLAGS
 #define DEBUG 0
 #define INFO 0
 
@@ -22,11 +29,14 @@
 #define LEVEL 100
 
 #define NAIVE_METHOD 1
+#endif
 
 typedef struct equivalence_class_indexes {
 	int start;
 	int end;
 	int offset;
 } equivalence_class_indexes;
+
+void pthreadsalgo_run(entry *dataset);
 
 #endif /* PTHREADSALGO_H */
