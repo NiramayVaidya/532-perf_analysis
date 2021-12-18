@@ -1,5 +1,7 @@
-#ifndef SEQALGO_H
-#define SEQALGO_H
+#ifndef PTHREADSALGO_H
+#define PTHREADSALGO_H
+
+#include <pthread.h>
 
 #include <vector>
 #include <tuple>
@@ -21,4 +23,10 @@
 
 #define NAIVE_METHOD 1
 
-#endif /* SEQALGO_H */
+typedef struct equivalence_class_indexes {
+	int start;
+	int end;
+	int offset;
+} equivalence_class_indexes;
+
+#endif /* PTHREADSALGO_H */

@@ -9,7 +9,7 @@ string output_file_naive = "frequent_itemsets_naive.txt";
 tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int offset, int level) {
 	vector<int> indexes;
 	long long time = 0;
-	
+
 	auto start = std::chrono::high_resolution_clock::now();
 
 	indexes.push_back(0);
@@ -48,29 +48,34 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 	time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
 #if INFO
-		cout << "l" << level << " ->" << endl;
-		for (int i = 0; i < li_next.size(); i++) {
-			for (int j = 0; j < li_next[i].size(); j++) {
-				cout << li_next[i][j];
-			}
-			cout << "\t";
+	cout << "l" << level << " ->" << endl;
+	cout << "Count = " << li_next.size() << endl;
+	for (int i = 0; i < li_next.size(); i++) {
+		int j;
+		cout << "{";
+		for (j = 0; j < li_next[i].size() - 1; j++) {
+			cout << li_next[i][j] << ", ";
 		}
-		cout << endl;
+		cout << li_next[i][j] << "}\t";
+	}
+	cout << endl;
 #endif
 
+	cout << "l" << level << " computation done" << endl;
+
 #if DEBUG
-		cout << "l" << level << " txids ->" << endl;
-		for (int i = 0; i < litxids_next.size(); i++) {
-			for (int j = 0; j < li_next[i].size(); j++) {
-				cout << li_next[i][j];
-			}
-			cout << " = ";
-			set<int>::iterator it;
-			for (it = litxids_next[i].begin(); it != litxids_next[i].end(); it++) {
-				cout << *it << " ";
-			}
-			cout << endl;
+	cout << "l" << level << " txids ->" << endl;
+	for (int i = 0; i < litxids_next.size(); i++) {
+		for (int j = 0; j < li_next[i].size(); j++) {
+			cout << li_next[i][j] << " ";
 		}
+		cout << "= ";
+		set<int>::iterator it;
+		for (it = litxids_next[i].begin(); it != litxids_next[i].end(); it++) {
+			cout << *it << " ";
+		}
+		cout << endl;
+	}
 #endif
 
 	tuple<vector<vector<int>>, vector<set<int>>, long long> ret;
@@ -79,10 +84,10 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 }
 
 #if NAIVE_METHOD
-tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, int level, int offset, entry *db) {
+tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, int offset, int level, entry *db) {
 	vector<int> indexes;
 	long long time = 0;
-	
+
 	auto start = std::chrono::high_resolution_clock::now();
 
 	indexes.push_back(0);
@@ -125,20 +130,25 @@ tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, i
 			}
 		}
 	}
-	
+
 	auto elapsed = std::chrono::high_resolution_clock::now() - start;
 	time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
 #if INFO
-		cout << "l" << level << " ->" << endl;
-		for (int i = 0; i < li_next.size(); i++) {
-			for (int j = 0; j < li_next[i].size(); j++) {
-				cout << li_next[i][j];
-			}
-			cout << "\t";
+	cout << "l" << level << " ->" << endl;
+	cout << "Count = " << li_next.size() << endl;
+	for (int i = 0; i < li_next.size(); i++) {
+		int j;
+		cout << "{";
+		for (j = 0; j < li_next[i].size() - 1; j++) {
+			cout << li_next[i][j] << ", ";
 		}
-		cout << endl;
+		cout << li_next[i][j] << "}\t";
+	}
+	cout << endl;
 #endif
+
+	cout << "l" << level << " computation done" << endl;
 
 	tuple<vector<vector<int>>, long long> ret;
 	ret = make_tuple(li_next, time);
@@ -196,15 +206,18 @@ int main() {
 
 #if INFO
 	cout << "l1 ->" << endl;
+	cout << "Count = " << l1.size() << endl;
 	for (int i = 0; i < l1.size(); i++) {
-		cout << l1[i] << "\t";
+		cout << "{" << l1[i] << "}\t";
 	}
 	cout << endl;
 #endif
 
+	cout << "l1 computation done" << endl;
+
 	vector<vector<int>> l2;
 	vector<set<int>> newdb;
-	
+
 	start = std::chrono::high_resolution_clock::now();
 
 	/* Computing l2 by combining pairs within l1
@@ -229,7 +242,7 @@ int main() {
 			}
 		}
 	}
-	
+
 	elapsed = std::chrono::high_resolution_clock::now() - start;
 	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
@@ -241,16 +254,19 @@ int main() {
 
 #if INFO
 	cout << "l2 ->" << endl;
+	cout << "Count = " << l2.size() << endl;
 	for (int i = 0; i < l2.size(); i++) {
-		cout << l2[i][0] << l2[i][1] << "\t";
+		cout << "{" << l2[i][0] << ", " << l2[i][1] << "}\t";
 	}
 	cout << endl;
 #endif
 
+	cout << "l2 computation done" << endl;
+
 #if DEBUG
 	cout << "Reformed dataset ->" << endl;
 	for (int i = 0; i < newdb.size(); i++) {
-		cout << l2[i][0] << l2[i][1] << " = ";
+		cout << l2[i][0] << " " << l2[i][1] << " = ";
 		set<int>::iterator it;
 		for (it = newdb[i].begin(); it != newdb[i].end(); it++) {
 			cout << *it << " ";
@@ -287,6 +303,7 @@ int main() {
 	int i;
 #if INFO
 	cout << "Frequent itemsets ->" << endl;
+	cout << "Count = " << all_freq_itemsets.size() << endl;
 #endif
 	for (i = 0; i < all_freq_itemsets.size() - 1; i++) {
 #if INFO
@@ -304,7 +321,7 @@ int main() {
 
 #if NAIVE_METHOD
 	vector<vector<int>> l2_naive;
-	
+
 	start = std::chrono::high_resolution_clock::now();
 
 	/* Computing l2 by combining pairs within l1
@@ -326,7 +343,7 @@ int main() {
 			}
 		}
 	}
-	
+
 	elapsed = std::chrono::high_resolution_clock::now() - start;
 	total_time_naive += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
@@ -339,7 +356,7 @@ int main() {
 #if INFO
 	cout << "l2 ->" << endl;
 	for (int i = 0; i < l2_naive.size(); i++) {
-		cout << l2_naive[i][0] << l2_naive[i][1] << "\t";
+		cout << "{" << l2_naive[i][0] << ", " << l2_naive[i][1] << "}\t";
 	}
 	cout << endl;
 #endif
@@ -351,7 +368,7 @@ int main() {
 	offset = 0;
 	for (int i = 3; i <= LEVEL; i++) {
 		if (li_naive.size() >= 1) {
-			tuple<vector<vector<int>>, long long> ret = compute_li_naive(li_naive, i, offset, db);
+			tuple<vector<vector<int>>, long long> ret = compute_li_naive(li_naive, offset, i, db);
 			li_naive = get<0>(ret);
 			total_time_naive += get<1>(ret);
 			for (int j = 0; j < li_naive.size(); j++) {
@@ -365,11 +382,12 @@ int main() {
 			break;
 		}
 	}
-	
+
 	fstream out_file_naive;
 	out_file_naive.open(output_file_naive, fstream::out | fstream::trunc);
 #if INFO
 	cout << "Frequent itemsets ->" << endl;
+	cout << "Count = " << all_freq_itemsets.size() << endl;
 #endif
 	for (i = 0; i < all_freq_itemsets_naive.size() - 1; i++) {
 #if INFO
