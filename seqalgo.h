@@ -12,11 +12,11 @@
 #include <chrono>
 
 #define DEBUG 0
-#define INFO 0
+#define INFO 1
 
-#define NUM_TX 50
-#define NUM_ITEMS 50
-#define THRESHOLD 10
+#define NUM_TX 10
+#define NUM_ITEMS 8
+#define THRESHOLD 4
 #define LEVEL 50
 
 #define NAIVE_METHOD 1

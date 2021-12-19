@@ -1,10 +1,76 @@
 #include "dataset.h"
 #include "seqalgo.h"
+#include <stdio.h>
+#include <cuda_runtime_api.h>
+#include <cuda.h>
 
 using namespace std;
 
 string output_file = "frequent_itemsets.txt";
 string output_file_naive = "frequent_itemsets_naive.txt";
+
+    int *dev_inp_li, *dev_inp_txids, *dev_inp_indices, *dev_out_li, *dev_out_txids;
+// CUDA Kernel
+// Each eq class decided by indices array is parallelized. 
+__global__ void compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_inp_indices, int *dev_out_li, int *dev_out_txids, int index_len, int total_items, int total_tx, int Th, int level)
+{
+    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    if(id < index_len - 1){
+        //id becomes the index position
+        //Step1: find the pairs of next Li
+        //Step2: compare with threshold - implement intersection
+        //Step3: create the corresponding txids
+        //eg: [0,2,5,6] - pairs would be 01, 23, 24
+        int start_index = dev_inp_indices[id];
+        int end_index = dev_inp_indices[id+1];
+        //finding pairs
+        for(int i = start_index; i < end_index; i++){
+            //within this eq class, find the intersection of txids and count the occurence
+            for(int k = start_index + 1; k < end_index; k++){
+                //check for i,k pair
+                int i_txid = i*total_tx;
+                int k_txid = k*total_tx;
+                int cnt = 0;
+                int lv_arr[total_tx];
+                for(int i = 0; i < total_tx; i++){
+                    lv_arr[i] = -1;
+                }
+                
+                //intersection
+                while((i_txid < (i+1)*total_tx) && (k_txid < (k+1)*total_tx)){
+                    if(dev_inp_txids[i_txid] == -1 || dev_inp_txids[k_txid] == -1){
+                        break;
+                    }
+
+                    else if(dev_inp_txids[i_txid] == dev_inp_txids[k_txid]){
+                        //store common element
+                        lv_arr[cnt] = dev_inp_txids[i_txid];
+                        cnt++;
+                        i_txid++;
+                        k_txid++;
+                    }
+
+                    else if (dev_inp_txids[i_txid] > dev_inp_txids[k_txid])){
+                        k_txid++;
+                    }
+                    else{
+                        i_txid++;
+                    }
+
+                }
+                
+                //check if count > Th
+                if(cnt > Th){
+                    //do union and copy the intersection wala txid
+                    int gap = level - 1;
+
+                }
+
+            }
+        }
+    }
+}
+
 
 tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector<int>> li, vector<set<int>> litxids, int offset, int level) {
 	vector<int> indexes;
@@ -25,9 +91,97 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 			indexes.push_back(i + 1);
 		}
 	}
-	indexes.push_back(li.size());
 
-	vector<vector<int>> li_next;
+    //print indices
+    /*
+    vector<int>::iterator ptr;
+    printf("Indices for level: %d\n ", level);
+    for (ptr = indexes.begin(); ptr < indexes.end(); ptr++){
+        cout << *ptr << " ";
+    }
+	indexes.push_back(li.size());
+    */
+
+    //Inputs here are: 
+    //indexes array: [0,2,4]
+    //L2: [{1, 5}	{1, 6}	{3, 5}	{3, 6}	{5, 6}]
+    //txids:[[], [], [], [], []] - the number of elements in L2 and txids should be same, like index of AB is L2 should also point to its corresponding txids. 
+    //To do work with GPU: 
+    //INPUT to GPU: index array, L2, txids
+    //OUTPUT from GPU: L3, txids
+    //convert L2 vector to linear array - each itemset element separated by the level (3 means 2 len itemset)
+    //convert txid set to linear array- each entry separated by len of dataset.
+    //have the corresponding output arrays. 
+	
+    //convert vector to array - linearizing the vector of vector
+    int byteLen_li = sizeof(int) * li.size() * (level-1); // total integers stored in the Itemset vector
+    int * lv_arr = (int *)malloc(byteLen_li);
+
+    for(int i = 0; i < li.size(); i++){
+        for(int j = 0; j < level - 1; j++){
+            int anchor_pt = i*(level-1);
+            lv_arr[anchor_pt + j] = li[i][j];
+            //printf("%d \t ", li[i][j]);
+        }
+        //printf("\n");
+    }
+
+    int byteLen_indices = sizeof(int) * indexes.size();
+    int * lv_index_arr = (int*)malloc(byteLen_indices);
+    for(int i = 0; i < indexes.size(); i++){
+            lv_index_arr[i] = indexes[i];
+    }
+
+
+
+    //convert set to array - linearizing the vector of set
+    int byteLen_txid = sizeof(int) * litxids.size() * (NUM_TX); // total integers stored in the Itemset vector
+    int * lv_arr2 = (int *)malloc(byteLen_txid);
+
+    for(int i = 0; i < litxids.size(); i++){
+        int anchor_pt = i*(NUM_TX);
+        for(int j = 0; j < NUM_TX; j++){
+            lv_arr2[anchor_pt + j] = -1;
+        }
+        
+        set<int>::iterator it;
+        int cnt = 0;
+		for (it = litxids[i].begin(); it != litxids[i].end(); it++) {
+            lv_arr2[anchor_pt + cnt] = *it;
+            cnt++;
+		}
+
+    }
+/*    
+    printf("The corresponding tTXIDS are: \n");
+
+    for(int i = 0; i < litxids.size(); i++){
+        for(int j = 0; j < NUM_TX; j++){
+            int anchor_pt = i*(NUM_TX);
+            printf("%d \t", lv_arr2[anchor_pt + j]);
+        }
+        printf("\n");
+        
+    }
+
+    printf("Total elements in Li are: %d\n", li.size());
+    printf("Total elements in Txid are: %d\n", litxids.size());
+    
+*/
+
+    //create the input and output arrays and do cuda malloc
+    int *dev_inp_li, *dev_inp_txids, *dev_inp_indices, *dev_out_li, *dev_out_txids;
+    cudaMalloc((void**)&dev_inp_li, byteLen_li);
+    cudaMalloc((void**)&dev_inp_txids, byteLen_txid);
+    cudaMalloc((void**)&dev_inp_indices, byteLen_indices);
+    int byteLen_li_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int);
+    cudaMalloc((void**)&dev_out_li, byteLen_li_out); // len is decided by max combinations which comes from len of li = (len_li) * (len_li-1) * 0.5
+    int byteLen_txid_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * NUM_TX;
+    cudaMalloc((void**)&dev_out_txids, byteLen_txid_out);
+    
+
+
+    vector<vector<int>> li_next;
 	vector<set<int>> litxids_next;
 	for (int i = 0; i < indexes.size() - 1; i++) {
 		for (int j = indexes[i]; j < indexes[i + 1] - 1; j++) {
