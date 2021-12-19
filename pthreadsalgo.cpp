@@ -5,11 +5,13 @@ using namespace std;
 static entry *db;
 
 static vector<vector<int>> all_freq_itemsets;
-long long total_time = 0;
+static long long total_time = 0;
+static long long total_time_seq = 0;
 
 #if NAIVE_METHOD
 static vector<vector<int>> all_freq_itemsets_naive;
 static long long total_time_naive = 0;
+static long long total_time_seq_naive = 0;
 #endif
 
 static vector<vector<int>> l2;
@@ -167,8 +169,11 @@ static void *launch_compute(void *pos) {
 	// pthread_mutex_lock(&lock);
 	if (l2.size() >= 1) {
 		// pthread_mutex_unlock(&lock);
+
 		vector<vector<int>> l3;
 		vector<set<int>> l3txids;
+
+		auto begin = std::chrono::high_resolution_clock::now();
 
 		for (int j = start; j < end - 1; j++) {
 			for (int k = j + 1; k <= end - 1; k++) {
@@ -186,6 +191,11 @@ static void *launch_compute(void *pos) {
 				}
 			}
 		}
+
+		auto end = std::chrono::high_resolution_clock::now() - begin;
+		pthread_mutex_lock(&lock);
+		total_time_seq += std::chrono::duration_cast<std::chrono::microseconds>(end).count();
+		pthread_mutex_unlock(&lock);
 
 #if INFO
 		cout << "l3" << " ->" << endl;
@@ -225,6 +235,9 @@ static void *launch_compute(void *pos) {
 		offset++;
 		vector<vector<int>> li = l3;
 		vector<set<int>> litxids = l3txids;
+
+		begin = std::chrono::high_resolution_clock::now();
+
 		for (int i = 4; i <= LEVEL; i++) {
 			if (li.size() >= 1) {
 				tuple<vector<vector<int>>, vector<set<int>>> ret = compute_li(li, litxids, offset, i);
@@ -239,6 +252,11 @@ static void *launch_compute(void *pos) {
 				break;
 			}
 		}
+
+		end = std::chrono::high_resolution_clock::now() - begin;
+		pthread_mutex_lock(&lock);
+		total_time_seq += std::chrono::duration_cast<std::chrono::microseconds>(end).count();
+		pthread_mutex_unlock(&lock);
 	}
 	// pthread_mutex_unlock(&lock);
 
@@ -256,6 +274,8 @@ static void *launch_compute_naive(void *pos) {
 	if (l2.size() >= 1) {
 		// pthread_mutex_unlock(&lock);
 		vector<vector<int>> l3;
+
+		auto begin = std::chrono::high_resolution_clock::now();
 
 		for (int j = start; j < end - 1; j++) {
 			for (int k = j + 1; k <= end - 1; k++) {
@@ -280,6 +300,11 @@ static void *launch_compute_naive(void *pos) {
 			}
 		}
 
+		auto end = std::chrono::high_resolution_clock::now() - begin;
+		pthread_mutex_lock(&lock);
+		total_time_seq_naive += std::chrono::duration_cast<std::chrono::microseconds>(end).count();
+		pthread_mutex_unlock(&lock);
+
 #if INFO
 		cout << "l3" << " ->" << endl;
 		cout << "Count = " << l3.size() << endl;
@@ -302,6 +327,9 @@ static void *launch_compute_naive(void *pos) {
 
 		offset++;
 		vector<vector<int>> li = l3;
+
+		begin = std::chrono::high_resolution_clock::now();
+
 		for (int i = 4; i <= LEVEL; i++) {
 			if (li.size() >= 1) {
 				li = compute_li_naive(li, offset, i);
@@ -314,6 +342,11 @@ static void *launch_compute_naive(void *pos) {
 				break;
 			}
 		}
+
+		end = std::chrono::high_resolution_clock::now() - begin;
+		pthread_mutex_lock(&lock);
+		total_time_seq_naive += std::chrono::duration_cast<std::chrono::microseconds>(end).count();
+		pthread_mutex_unlock(&lock);
 	}
 
 	return NULL;
@@ -345,8 +378,10 @@ void pthreadsalgo_run(entry *dataset) {
 
 	auto elapsed = std::chrono::high_resolution_clock::now() - start;
 	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+	total_time_seq += total_time;
 #if NAIVE_METHOD
 	total_time_naive += total_time;
+	total_time_seq_naive += total_time;
 #endif
 
 	for (int i = 0; i < l1.size(); i++) {
@@ -396,6 +431,7 @@ void pthreadsalgo_run(entry *dataset) {
 
 	elapsed = std::chrono::high_resolution_clock::now() - start;
 	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+	total_time_seq = total_time; 
 
 	all_freq_itemsets.insert(all_freq_itemsets.end(), l2.begin(), l2.end());
 
@@ -444,16 +480,28 @@ void pthreadsalgo_run(entry *dataset) {
 
 	elapsed = std::chrono::high_resolution_clock::now() - start;
 	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+	total_time_seq = total_time;
 
 	vector<pthread_t> tids(indexes.size() - 1);
 
 	pthread_mutex_init(&lock, NULL);
 
-	start = std::chrono::high_resolution_clock::now();
-
-#if DEBUG
+// #if DEBUG
 	cout << "Thread count = " << tids.size() << endl;
+// #endif
+
+#if USE_CPU_AFFINITY
+	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+// #if DEBUG
+	cout << "Available cores = " << num_cores << endl;
+// #endif
+
+	pthread_attr_t attr;
+	cpu_set_t cpus;
+	pthread_attr_init(&attr);
 #endif
+
+	start = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < tids.size(); i++) {
 		equivalence_class_indexes eci;
@@ -468,7 +516,18 @@ void pthreadsalgo_run(entry *dataset) {
 		cout << "Start index = " << ecis[i].start << ", end index = " << ecis[i].end << endl;
 #endif
 		long pos = (long) i;
+
+#if USE_CPU_AFFINITY
+		CPU_ZERO(&cpus);
+		CPU_SET(i % num_cores, &cpus);
+		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+#endif
+
+#if USE_CPU_AFFINITY
+		pthread_create(&tids[i], &attr, launch_compute, (void *) pos);
+#else
 		pthread_create(&tids[i], NULL, launch_compute, (void *) pos);
+#endif
 	}
 	
 	for (int i = 0; i < tids.size(); i++) {
@@ -509,6 +568,7 @@ void pthreadsalgo_run(entry *dataset) {
 	out_file.close();
 
 	cout << "Total parallel execution time (optimal algorithm) = " << total_time << " us" << endl;
+	cout << "Total sequential execution time (optimal algorithm) = " << total_time_seq << " us" << endl;
 
 #if NAIVE_METHOD
 	vector<vector<int>> l2_naive;
@@ -578,9 +638,9 @@ void pthreadsalgo_run(entry *dataset) {
 
 	start = std::chrono::high_resolution_clock::now();
 
-#if DEBUG
+// #if DEBUG
 	cout << "Thread count = " << tids_naive.size() << endl;
-#endif
+// #endif
 
 	ecis.clear();
 	for (int i = 0; i < tids.size(); i++) {
@@ -596,7 +656,18 @@ void pthreadsalgo_run(entry *dataset) {
 		cout << "Start index = " << ecis[i].start << ", end index = " << ecis[i].end << endl;
 #endif
 		long pos = (long) i;
+
+#if USE_CPU_AFFINITY
+		CPU_ZERO(&cpus);
+		CPU_SET(i % num_cores, &cpus);
+		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+#endif
+
+#if USE_CPU_AFFINITY
+		pthread_create(&tids_naive[i], &attr, launch_compute_naive, (void *) pos);
+#else
 		pthread_create(&tids_naive[i], NULL, launch_compute_naive, (void *) pos);
+#endif
 	}
 	
 	for (int i = 0; i < tids_naive.size(); i++) {
@@ -637,6 +708,7 @@ void pthreadsalgo_run(entry *dataset) {
 	out_file_naive.close();
 
 	cout << "Total parallel execution time (naive algorithm) = " << total_time_naive << " us" << endl;
+	cout << "Total sequential execution time (naive algorithm) = " << total_time_seq_naive << " us" << endl;
 
 #endif
 
