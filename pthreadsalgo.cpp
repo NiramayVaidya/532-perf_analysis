@@ -19,6 +19,7 @@ static vector<set<int>> newdb;
 
 static vector<equivalence_class_indexes> ecis;
 
+static string load_file = "dataset.txt";
 static string output_file = "frequent_itemsets_pthreads.txt";
 static string output_file_naive = "frequent_itemsets_naive_pthreads.txt";
 

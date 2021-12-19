@@ -7,6 +7,9 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
+using namespace std;
 
 typedef struct entry {
     int txid;
@@ -14,6 +17,7 @@ typedef struct entry {
 } entry;
 
 void generate_dataset(entry *db, int len, int total_items);
+void load_dataset(entry *db, int len, int total_items, string load_filename);
 void print_dataset(entry *db);
 void save_dataset(entry *db);
 

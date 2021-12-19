@@ -35,6 +35,28 @@ void generate_dataset(entry *db, int len, int total_items) {
 	}
 }
 
+void load_dataset(entry *db, int len, int total_items, string load_filename) {
+	g_len = len;
+	g_total_items = total_items;
+	ifstream load_file(load_filename);
+	string line;
+	int i = 0;
+	while(getline(load_file, line)) {
+		db[i].txid = i;
+		string word;
+		stringstream words(line);
+		int j = 0;
+		while (getline(words, word, ' ')) {
+			db[i].item_present[j] = atoi(word.c_str());
+			if (db[i].item_present[j] == 1) {
+				cnt_1++;
+			}
+			j++;
+		}
+		i++;
+	}
+}
+
 void print_dataset(entry *db) {
 	// first row
 	for (int i = 0; i < g_total_items + 1; i++) {
