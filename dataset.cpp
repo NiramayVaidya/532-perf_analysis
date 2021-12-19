@@ -1,5 +1,9 @@
 #include "dataset.h"
 
+using namespace std;
+
+string dataset_file = "dataset.txt";
+
 int g_len;
 int g_total_items;
 // entry *db;
@@ -52,6 +56,19 @@ void print_dataset(entry *db) {
 	}
 
 	printf("Validating distribution of values: %d / %d\n", cnt_1, g_total_items * g_len);
+}
+
+void save_dataset(entry *db) {
+	fstream db_file;
+	db_file.open(dataset_file, fstream::out | fstream::trunc);
+	for (int i = 0; i < g_len; i++) {
+		int j;
+		for (j = 0; j < g_total_items - 1; j++) {
+			db_file << db[i].item_present[j] << " ";
+		}
+		db_file << db[i].item_present[j] << endl;
+	}
+	db_file.close();
 }
 
 /*

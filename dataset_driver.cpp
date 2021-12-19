@@ -1,5 +1,9 @@
-#include "seqalgo.h"
-#include "pthreadsalgo.h"
+#include "dataset.h"
+
+#define DEBUG 0
+
+#define NUM_TX 1000
+#define NUM_ITEMS 30
 
 int main(int argc, char *argv[]) {
 	entry *data = (entry *) malloc(NUM_TX * sizeof(entry));
@@ -11,10 +15,6 @@ int main(int argc, char *argv[]) {
 #endif
 
 	save_dataset(data);
-
-	seqalgo_run(data);
-
-	pthreadsalgo_run(data);
 
 	free(data);
 

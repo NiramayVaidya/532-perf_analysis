@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include <iostream>
+#include <fstream>
 
 typedef struct entry {
     int txid;
@@ -14,5 +15,6 @@ typedef struct entry {
 
 void generate_dataset(entry *db, int len, int total_items);
 void print_dataset(entry *db);
+void save_dataset(entry *db);
 
 #endif /* DATASET_H */
