@@ -31,6 +31,21 @@ __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_in
         printf("End of indices array check\n");
         int start_index = dev_inp_indices[id];
         int end_index = dev_inp_indices[id+1];
+        printf("For TID: %d, start_index is %d, end_index is %d", id, start_index,end_index);
+        int anchor_pt_li = 0;
+        int anchor_pt_txid = 0;
+        if(id == 0){
+            anchor_pt_li = 0;
+            anchor_pt_txid = 0;
+        }
+        else{
+            int prev_index = dev_inp_indices[id - 1];
+            int diff = start_index;
+            anchor_pt_li = ((diff) * (diff-1) * level) /2;
+            anchor_pt_txid = ((diff) * (diff-1) * total_tx) /2;
+        }
+        printf("TID %d using anchor_pt_li %d\n", id, anchor_pt_li);
+
         //finding pairs
         for(int i = start_index; i < end_index - 1; i++){
             //within this eq class, find the intersection of txids and count the occurence
@@ -40,6 +55,7 @@ __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_in
                 int k_txid = k*total_tx;
                 int cnt = 0;
                 int lv_arr[NUM_TX];
+                
                 for(int i = 0; i < total_tx; i++){
                     lv_arr[i] = -1;
                 }
@@ -96,12 +112,10 @@ __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_in
                     //int lv_li_arr[level];
                     printf("Value of cnt is: %d for pair: (%d %d), (%d %d)\n", cnt,dev_inp_li[i_li], dev_inp_li[i_li + 1], dev_inp_li[k_li], dev_inp_li[k_li+ 1] );
 
-                    int anchor_pt_li = (i+k)*level;
                     cnt = 0;
-                    printf("INSIDE CUDA: printing the next li: \n");
+                    printf("INSIDE CUDA: printing the next li: , STORing at: %d\n", anchor_pt_li);
                     //union
-                    while((i_li < (i+1)*gap) && (k_li < (k+1)*gap)){
-                        
+                    while((i_li < (i+1)*gap) && (k_li < (k+1)*gap)){ 
                         if(dev_inp_li[i_li] == dev_inp_li[k_li]){
                             //store common element
                             //lv_li_arr[cnt] = dev_inp_li[i_li];
@@ -149,18 +163,20 @@ __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_in
                     }
                     printf("\n");
                     
+                    anchor_pt_li = anchor_pt_li + level;
                     // store the txids and union in the output array
                     /*
                     for(int z = 0; z < level; z++){
                         dev_out_li[anchor_pt_li + z] = lv_li_arr[z];
                     }*/
 
-                    int anchor_pt_txid = (i+k)*total_tx;
+                    //int anchor_pt_txid = (i+k)*total_tx;
                     printf("INSIDE CUDA: printing the next txids: \n");
                     for(int z = 0; z < total_tx; z++){
                         dev_out_txids[anchor_pt_txid + z] = lv_arr[z];
                         printf("%d \t", lv_arr[z]);
                     }
+                    anchor_pt_txid = anchor_pt_txid + total_tx;
                     printf("\n");
 
             }
@@ -176,163 +192,210 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 	long long time = 0;
 	
 	auto start = std::chrono::high_resolution_clock::now();
-
-	indexes.push_back(0);
-	for (int i = 0; i < li.size() - 1; i++) {
-		bool all_same = true;
-		for (int j = 0; j <= offset; j++) {
-			if (li[i][j] != li[i + 1][j]) {
-				all_same = false;
-				break;
-			}
-		}
-		if (!all_same) {
-			indexes.push_back(i + 1);
-		}
-	}
-
-    //print indices
-    
-    indexes.push_back(li.size());
-    vector<int>::iterator ptr;
-    printf("Indices for level: %d\n ", level);
-    for (ptr = indexes.begin(); ptr < indexes.end(); ptr++){
-        cout << *ptr << " ";
-    }
-	printf("\n");
-    
-
-    //Inputs here are: 
-    //indexes array: [0,2,4]
-    //L2: [{1, 5}	{1, 6}	{3, 5}	{3, 6}	{5, 6}]
-    //txids:[[], [], [], [], []] - the number of elements in L2 and txids should be same, like index of AB is L2 should also point to its corresponding txids. 
-    //To do work with GPU: 
-    //INPUT to GPU: index array, L2, txids
-    //OUTPUT from GPU: L3, txids
-    //convert L2 vector to linear array - each itemset element separated by the level (3 means 2 len itemset)
-    //convert txid set to linear array- each entry separated by len of dataset.
-    //have the corresponding output arrays. 
-	
-    //convert vector to array - linearizing the vector of vector
-    int byteLen_li = sizeof(int) * li.size() * (level-1); // total integers stored in the Itemset vector
-    int * lv_arr = (int *)malloc(byteLen_li);
-
-    for(int i = 0; i < li.size(); i++){
-        for(int j = 0; j < level - 1; j++){
-            int anchor_pt = i*(level-1);
-            lv_arr[anchor_pt + j] = li[i][j];
-            //printf("%d \t ", li[i][j]);
-        }
-       // printf("\n");
-    }
-
-    int byteLen_indices = sizeof(int) * indexes.size();
-    int * lv_index_arr = (int*)malloc(byteLen_indices);
-    for(int i = 0; i < indexes.size(); i++){
-            lv_index_arr[i] = indexes[i];
-    }
-
-
-
-    //convert set to array - linearizing the vector of set
-    int byteLen_txid = sizeof(int) * litxids.size() * (NUM_TX); // total integers stored in set (max)
-    int * lv_arr2 = (int *)malloc(byteLen_txid);
-
-    for(int i = 0; i < litxids.size(); i++){
-        int anchor_pt = i*(NUM_TX);
-        for(int j = 0; j < NUM_TX; j++){
-            lv_arr2[anchor_pt + j] = -1;
-        }
-        
-        set<int>::iterator it;
-        int cnt = 0;
-		for (it = litxids[i].begin(); it != litxids[i].end(); it++) {
-            lv_arr2[anchor_pt + cnt] = *it;
-            cnt++;
-		}
-
-    }
-   /* 
-    printf("The corresponding tTXIDS are: \n");
-
-    for(int i = 0; i < litxids.size(); i++){
-        for(int j = 0; j < NUM_TX; j++){
-            int anchor_pt = i*(NUM_TX);
-            printf("%d \t", lv_arr2[anchor_pt + j]);
-        }
-        printf("\n");
-        
-    }
-
-    printf("Total elements in Li are: %d\n", li.size());
-    printf("Total elements in Txid are: %d\n", litxids.size());
-    
-*/
-
-    //create the input and output arrays and do cuda malloc
-    int *dev_inp_li, *dev_inp_txids, *dev_inp_indices, *dev_out_li, *dev_out_txids;
-    cudaMalloc((void**)&dev_inp_li, byteLen_li);
-    cudaMalloc((void**)&dev_inp_txids, byteLen_txid);
-    cudaMalloc((void**)&dev_inp_indices, byteLen_indices);
-    int byteLen_li_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * level;
-    cudaMalloc((void**)&dev_out_li, byteLen_li_out); // len is decided by max combinations which comes from len of li = (len_li) * (len_li-1) * 0.5
-    int byteLen_txid_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * NUM_TX;
-    cudaMalloc((void**)&dev_out_txids, byteLen_txid_out);
-    
-    int * recv_li = (int *)malloc(byteLen_li_out);
-    int * recv_txids = (int *)malloc(byteLen_txid_out);
-    cudaMemcpy(dev_inp_li,lv_arr , byteLen_li, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_inp_txids, lv_arr2, byteLen_txid, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_inp_indices, lv_index_arr, byteLen_indices, cudaMemcpyHostToDevice);
-
-    int len_indices = indexes.size();
-    printf("Launching kernel!\n");
-    //TODO change total TBs to #eq_classes
-    cuda_compute_li<<<1,1>>>(dev_inp_li, dev_inp_txids, dev_inp_indices, dev_out_li,dev_out_txids, len_indices, NUM_ITEMS,NUM_TX, THRESHOLD,level);
-    cudaMemcpy(recv_li, dev_out_li, byteLen_li_out, cudaMemcpyDeviceToHost);
-    cudaMemcpy(recv_txids, dev_out_txids,byteLen_txid_out, cudaMemcpyDeviceToHost);
-    
-
-
-    //print recevied li
-    printf("##### GPU computed Lis are: #####\n");
-    for(int i = 0; i < byteLen_li_out/sizeof(int); i = i + level){
-        for(int j = 0; j < level; j++){
-            int anchor_pt = i*(level);
-            //lv_arr[anchor_pt + j] = li[i][j];
-            printf("%d \t ", recv_li[anchor_pt + j]);
-        }
-        printf("\n");
-    }
-    
-    printf("##### GPU computed TXIDs are: #####\n");
-    for(int i = 0; i < byteLen_txid_out/sizeof(int); i = i + NUM_TX){
-        for(int j = 0; j < NUM_TX; j++){
-            int anchor_pt = i*(NUM_TX);
-            //lv_arr[anchor_pt + j] = li[i][j];
-            printf("%d \t ", recv_txids[anchor_pt + j]);
-        }
-        printf("\n");
-    }
-
     vector<vector<int>> li_next;
-	vector<set<int>> litxids_next;
-	/*
-    for (int i = 0; i < indexes.size() - 1; i++) {
-		for (int j = indexes[i]; j < indexes[i + 1] - 1; j++) {
-			for (int k = j + 1; k <= indexes[i + 1] - 1; k++) {
-				set<int> txids;
-				set_intersection(litxids[j].begin(), litxids[j].end(), litxids[k].begin(), litxids[k].end(), inserter(txids, txids.begin()));
-				if (txids.size() >= THRESHOLD) {
-					vector<int> items;
-					set_union(li[j].begin(), li[j].end(), li[k].begin(), li[k].end(), back_inserter(items));
-					li_next.push_back(items);
-					litxids_next.push_back(txids);
-				}
-			}
-		}
-	}*/
-	
+    vector<set<int>> litxids_next;
+        
+
+    if(li.size() > 2){
+
+        indexes.push_back(0);
+        for (int i = 0; i < li.size() - 1; i++) {
+            bool all_same = true;
+            for (int j = 0; j <= offset; j++) {
+                if (li[i][j] != li[i + 1][j]) {
+                    all_same = false;
+                    break;
+                }
+            }
+            if (!all_same) {
+                indexes.push_back(i + 1);
+            }
+        }
+
+        //print indices
+        
+        indexes.push_back(li.size());
+        vector<int>::iterator ptr;
+        printf("Indices for level: %d\n ", level);
+        for (ptr = indexes.begin(); ptr < indexes.end(); ptr++){
+            cout << *ptr << " ";
+        }
+        printf("\n");
+        
+
+        //Inputs here are: 
+        //indexes array: [0,2,4]
+        //L2: [{1, 5}	{1, 6}	{3, 5}	{3, 6}	{5, 6}]
+        //txids:[[], [], [], [], []] - the number of elements in L2 and txids should be same, like index of AB is L2 should also point to its corresponding txids. 
+        //To do work with GPU: 
+        //INPUT to GPU: index array, L2, txids
+        //OUTPUT from GPU: L3, txids
+        //convert L2 vector to linear array - each itemset element separated by the level (3 means 2 len itemset)
+        //convert txid set to linear array- each entry separated by len of dataset.
+        //have the corresponding output arrays. 
+        
+        //convert vector to array - linearizing the vector of vector
+        int byteLen_li = sizeof(int) * li.size() * (level-1); // total integers stored in the Itemset vector
+        int * lv_arr = (int *)malloc(byteLen_li);
+
+        for(int i = 0; i < li.size(); i++){
+            for(int j = 0; j < level - 1; j++){
+                int anchor_pt = i*(level-1);
+                lv_arr[anchor_pt + j] = li[i][j];
+                //printf("%d \t ", li[i][j]);
+            }
+           // printf("\n");
+        }
+
+        int byteLen_indices = sizeof(int) * indexes.size();
+        int * lv_index_arr = (int*)malloc(byteLen_indices);
+        for(int i = 0; i < indexes.size(); i++){
+                lv_index_arr[i] = indexes[i];
+        }
+
+
+
+        //convert set to array - linearizing the vector of set
+        int byteLen_txid = sizeof(int) * litxids.size() * (NUM_TX); // total integers stored in set (max)
+        int * lv_arr2 = (int *)malloc(byteLen_txid);
+
+        for(int i = 0; i < litxids.size(); i++){
+            int anchor_pt = i*(NUM_TX);
+            for(int j = 0; j < NUM_TX; j++){
+                lv_arr2[anchor_pt + j] = -1;
+            }
+            
+            set<int>::iterator it;
+            int cnt = 0;
+            for (it = litxids[i].begin(); it != litxids[i].end(); it++) {
+                lv_arr2[anchor_pt + cnt] = *it;
+                cnt++;
+            }
+
+        }
+       /* 
+        printf("The corresponding tTXIDS are: \n");
+
+        for(int i = 0; i < litxids.size(); i++){
+            for(int j = 0; j < NUM_TX; j++){
+                int anchor_pt = i*(NUM_TX);
+                printf("%d \t", lv_arr2[anchor_pt + j]);
+            }
+            printf("\n");
+            
+        }
+
+        printf("Total elements in Li are: %d\n", li.size());
+        printf("Total elements in Txid are: %d\n", litxids.size());
+        
+    */
+
+        //create the input and output arrays and do cuda malloc
+        int *dev_inp_li, *dev_inp_txids, *dev_inp_indices, *dev_out_li, *dev_out_txids;
+        cudaMalloc((void**)&dev_inp_li, byteLen_li);
+        cudaMalloc((void**)&dev_inp_txids, byteLen_txid);
+        cudaMalloc((void**)&dev_inp_indices, byteLen_indices);
+        int byteLen_li_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * level;
+        cudaMalloc((void**)&dev_out_li, byteLen_li_out); // len is decided by max combinations which comes from len of li = (len_li) * (len_li-1) * 0.5
+        int byteLen_txid_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * NUM_TX;
+        cudaMalloc((void**)&dev_out_txids, byteLen_txid_out);
+        
+        int * recv_li = (int *)malloc(byteLen_li_out);
+        int * recv_txids = (int *)malloc(byteLen_txid_out);
+        cudaMemcpy(dev_inp_li,lv_arr , byteLen_li, cudaMemcpyHostToDevice);
+        cudaMemcpy(dev_inp_txids, lv_arr2, byteLen_txid, cudaMemcpyHostToDevice);
+        cudaMemcpy(dev_inp_indices, lv_index_arr, byteLen_indices, cudaMemcpyHostToDevice);
+
+        int len_indices = indexes.size();
+        printf("Launching kernel!\n");
+        //TODO change total TBs to #eq_classes
+        cuda_compute_li<<<len_indices,1>>>(dev_inp_li, dev_inp_txids, dev_inp_indices, dev_out_li,dev_out_txids, len_indices, NUM_ITEMS,NUM_TX, THRESHOLD,level);
+        cudaMemcpy(recv_li, dev_out_li, byteLen_li_out, cudaMemcpyDeviceToHost);
+        cudaMemcpy(recv_txids, dev_out_txids,byteLen_txid_out, cudaMemcpyDeviceToHost);
+        
+
+
+        //print recevied li
+        printf("##### GPU computed Lis are: #####\n");
+        for(int i = 0; i < byteLen_li_out/(sizeof(int) * level); i++){
+            for(int j = 0; j < level; j++){
+                int anchor_pt = i*(level);
+                printf("%d\t", recv_li[anchor_pt + j]);
+            }
+            printf("\n");
+        }
+        
+        printf("##### GPU computed TXIDs are: #####\n");
+        for(int i = 0; i < byteLen_txid_out/(sizeof(int)*NUM_TX); i++){
+            for(int j = 0; j < NUM_TX; j++){
+                int anchor_pt = i*(NUM_TX);
+                printf("%d\t", recv_txids[anchor_pt + j]);
+            }
+            printf("\n");
+        }
+
+
+        printf(">> STORING into vector li_next\n");
+        //construct the li_next and litxids_next from the GPU output
+        int prev_index = 0; // To solve indices like {0,1,4,5} = where 0 , 1 cause to same li_start_index
+        for(int i = 0; i < indexes.size() - 1; i++){
+            int start_index = indexes[i];
+            if(i == 0){
+                if(indexes[1] == 1){
+                    printf("Case of same index!\n");
+                    continue;
+                }
+            }
+            int li_start_index = ((start_index) * (start_index - 1) * level)/ 2;
+            int txid_start_index = ((start_index) * (start_index - 1) * NUM_TX)/ 2;
+            int cnt = 0;
+            while(recv_li[li_start_index] != 0){
+                //copy the entry of li and txid
+                vector<int> items;
+                printf("index[%d] = %d, At index: %d\n", i, indexes[i], li_start_index);
+                for(int j = 0; j < level; j++){
+                    printf("%d ", recv_li[li_start_index + j]);
+                    items.push_back(recv_li[li_start_index + j]);    
+                }
+                //printf("\n");
+                li_next.push_back(items);
+
+                set<int> txids;
+                for(int j = 0; j < NUM_TX; j++){
+                    if(recv_txids[txid_start_index + j] != -1){
+                        txids.insert(recv_txids[txid_start_index + j]);
+                    }
+                    else{
+                        break;
+                    }
+                }
+                litxids_next.push_back(txids);
+                cnt++;
+                li_start_index+=level;
+                txid_start_index+=NUM_TX;
+            }
+        }
+
+
+
+
+        
+        /*
+        for (int i = 0; i < indexes.size() - 1; i++) {
+            for (int j = indexes[i]; j < indexes[i + 1] - 1; j++) {
+                for (int k = j + 1; k <= indexes[i + 1] - 1; k++) {
+                    set<int> txids;
+                    set_intersection(litxids[j].begin(), litxids[j].end(), litxids[k].begin(), litxids[k].end(), inserter(txids, txids.begin()));
+                    if (txids.size() >= THRESHOLD) {
+                        vector<int> items;
+                        set_union(li[j].begin(), li[j].end(), li[k].begin(), li[k].end(), back_inserter(items));
+                        li_next.push_back(items);
+                        litxids_next.push_back(txids);
+                    }
+                }
+            }
+        }*/
+    } 
 	auto elapsed = std::chrono::high_resolution_clock::now() - start;
 	time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
