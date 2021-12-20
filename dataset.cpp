@@ -14,7 +14,7 @@ static int get_probabilistic_value() {
 	int dist_len = 10000;
 	int rand_val = rand() % dist_len;
 	// printf("Rand value is : %d\n", rand_val);
-	float chance = 0.5; // 80% chance to get 0
+	float chance = PROBABILITY; // 80% chance to get 0
 	if (rand_val > chance * dist_len) { 
 		val = 1;
 		cnt_1++;

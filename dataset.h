@@ -9,6 +9,8 @@
 #include <fstream>
 #include <sstream>
 
+#define PROBABILITY 0.5
+
 using namespace std;
 
 typedef struct entry {

@@ -310,7 +310,7 @@ void seqalgo_run(entry *db) {
 	out_file << all_freq_itemsets[i] << endl;
 	out_file.close();
 
-	cout << "Total execution time (optimal algorithm) = " << total_time << " us" << endl;
+	cout << "Total execution time (optimal algorithm) = " << total_time / 1000000.0 << " s" << endl;
 
 #if NAIVE_METHOD
 	vector<vector<int>> l2_naive;
@@ -394,7 +394,7 @@ void seqalgo_run(entry *db) {
 	out_file_naive << all_freq_itemsets_naive[i] << endl;
 	out_file_naive.close();
 
-	cout << "Total execution time (naive algorithm) = " << total_time_naive << " us" << endl;
+	cout << "Total execution time (naive algorithm) = " << total_time_naive / 1000000.0 << " s" << endl;
 #endif
 
 	// free(db);

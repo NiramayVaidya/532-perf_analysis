@@ -568,8 +568,8 @@ void pthreadsalgo_run(entry *dataset) {
 #endif
 	out_file.close();
 
-	cout << "Total parallel execution time (optimal algorithm) = " << total_time << " us" << endl;
-	cout << "Total sequential execution time (optimal algorithm) = " << total_time_seq << " us" << endl;
+	cout << "Total parallel execution time (optimal algorithm) = " << total_time / 1000000.0 << " s" << endl;
+	cout << "Total sequential execution time (optimal algorithm) = " << total_time_seq / 1000000.0 << " s" << endl;
 
 #if NAIVE_METHOD
 	vector<vector<int>> l2_naive;
@@ -708,8 +708,8 @@ void pthreadsalgo_run(entry *dataset) {
 #endif
 	out_file_naive.close();
 
-	cout << "Total parallel execution time (naive algorithm) = " << total_time_naive << " us" << endl;
-	cout << "Total sequential execution time (naive algorithm) = " << total_time_seq_naive << " us" << endl;
+	cout << "Total parallel execution time (naive algorithm) = " << total_time_naive / 1000000.0 << " s" << endl;
+	cout << "Total sequential execution time (naive algorithm) = " << total_time_seq_naive / 1000000.0 << " s" << endl;
 
 #endif
 

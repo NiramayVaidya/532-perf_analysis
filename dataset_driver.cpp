@@ -5,7 +5,7 @@
 #define NUM_TX 1000
 #define NUM_ITEMS 30
 
-#define LOAD_DB 1
+#define LOAD_DB 0
 
 using namespace std;
 
