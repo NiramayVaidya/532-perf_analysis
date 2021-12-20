@@ -349,7 +349,7 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
             int li_start_index = ((start_index) * (start_index - 1) * level)/ 2;
             int txid_start_index = ((start_index) * (start_index - 1) * NUM_TX)/ 2;
             int cnt = 0;
-            while(recv_li[li_start_index] != 0){
+            while(recv_li[li_start_index] != 0 && li_start_index >= prev_index){
                 //copy the entry of li and txid
                 vector<int> items;
                 printf("index[%d] = %d, At index: %d\n", i, indexes[i], li_start_index);
@@ -357,7 +357,7 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
                     printf("%d ", recv_li[li_start_index + j]);
                     items.push_back(recv_li[li_start_index + j]);    
                 }
-                //printf("\n");
+                printf("\n");
                 li_next.push_back(items);
 
                 set<int> txids;
@@ -374,6 +374,7 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
                 li_start_index+=level;
                 txid_start_index+=NUM_TX;
             }
+            prev_index = li_start_index;
         }
 
 
