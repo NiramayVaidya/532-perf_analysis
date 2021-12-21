@@ -24,11 +24,12 @@ __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_in
         //Step3: create the corresponding txids
         //eg: [0,3,5,6] - pairs would be 01, 02, 12
         
+        /*
         printf("indices array: >>>>>>>>>>>> \n");
         for(int x = 0; x < index_len; x++){
             printf("%d \t", dev_inp_indices[x]);
         }
-        printf("End of indices array check\n");
+        printf("End of indices array check\n");*/
         int start_index = dev_inp_indices[id];
         int end_index = dev_inp_indices[id+1];
         printf("For TID: %d, start_index is %d, end_index is %d", id, start_index,end_index);
@@ -39,10 +40,12 @@ __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_in
             anchor_pt_txid = 0;
         }
         else{
-            int prev_index = dev_inp_indices[id - 1];
+            //int prev_index = dev_inp_indices[id - 1];
             int diff = start_index;
-            anchor_pt_li = ((diff) * (diff-1) * level) /2;
-            anchor_pt_txid = ((diff) * (diff-1) * total_tx) /2;
+            //anchor_pt_li = ((diff) * (diff-1) * level) /2;
+            //anchor_pt_txid = ((diff) * (diff-1) * total_tx) /2;
+            anchor_pt_li = id * level;
+            anchor_pt_txid = id * total_tx;
         }
         printf("TID %d using anchor_pt_li %d\n", id, anchor_pt_li);
 
@@ -60,12 +63,6 @@ __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_in
                     lv_arr[i] = -1;
                 }
 
-                //TODO print the corresponding data: 
-                //printf(                      );
-                for(int x = 0; x < level-1; x++){
-                    printf("");
-                }
-                
                 //int lv_it_k = k_txid;
                 /*
                 printf("First element's TXIDS\n");
@@ -163,7 +160,7 @@ __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_in
                     }
                     printf("\n");
                     
-                    anchor_pt_li = anchor_pt_li + level;
+                    anchor_pt_li = anchor_pt_li + index_len*level;
                     // store the txids and union in the output array
                     /*
                     for(int z = 0; z < level; z++){
@@ -174,9 +171,9 @@ __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_in
                     printf("INSIDE CUDA: printing the next txids: \n");
                     for(int z = 0; z < total_tx; z++){
                         dev_out_txids[anchor_pt_txid + z] = lv_arr[z];
-                        printf("%d \t", lv_arr[z]);
+                        //printf("%d \t", lv_arr[z]);
                     }
-                    anchor_pt_txid = anchor_pt_txid + total_tx;
+                    anchor_pt_txid = anchor_pt_txid + index_len*total_tx;
                     printf("\n");
 
             }
@@ -295,10 +292,13 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
         cudaMalloc((void**)&dev_inp_li, byteLen_li);
         cudaMalloc((void**)&dev_inp_txids, byteLen_txid);
         cudaMalloc((void**)&dev_inp_indices, byteLen_indices);
+        //int max_elem = *(std::max_element(indexes.begin(), indexes.end()));
+        //printf("maximum element in the index array is: %d\n");
         int byteLen_li_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * level;
-        cudaMalloc((void**)&dev_out_li, byteLen_li_out); // len is decided by max combinations which comes from len of li = (len_li) * (len_li-1) * 0.5
+        //int byteLen_li_out = ((max_elem * (max_elem+1)) / 2) * sizeof(int) * level;
+        CUDA_SAFE_CALL(cudaMalloc((void**)&dev_out_li, byteLen_li_out)); // len is decided by max combinations which comes from len of li = (len_li) * (len_li-1) * 0.5
         int byteLen_txid_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * NUM_TX;
-        cudaMalloc((void**)&dev_out_txids, byteLen_txid_out);
+        CUDA_SAFE_CALL(cudaMalloc((void**)&dev_out_txids, byteLen_txid_out));
         
         int * recv_li = (int *)malloc(byteLen_li_out);
         int * recv_txids = (int *)malloc(byteLen_txid_out);
@@ -310,12 +310,14 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
         printf("Launching kernel!\n");
         //TODO change total TBs to #eq_classes
         cuda_compute_li<<<len_indices,1>>>(dev_inp_li, dev_inp_txids, dev_inp_indices, dev_out_li,dev_out_txids, len_indices, NUM_ITEMS,NUM_TX, THRESHOLD,level);
+        cudaDeviceSynchronize();
         cudaMemcpy(recv_li, dev_out_li, byteLen_li_out, cudaMemcpyDeviceToHost);
         cudaMemcpy(recv_txids, dev_out_txids,byteLen_txid_out, cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
+
+
         
-
-
-        //print recevied li
+        /*//print recevied li
         printf("##### GPU computed Lis are: #####\n");
         for(int i = 0; i < byteLen_li_out/(sizeof(int) * level); i++){
             for(int j = 0; j < level; j++){
@@ -333,23 +335,19 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
             }
             printf("\n");
         }
-
+        */
 
         printf(">> STORING into vector li_next\n");
         //construct the li_next and litxids_next from the GPU output
         int prev_index = 0; // To solve indices like {0,1,4,5} = where 0 , 1 cause to same li_start_index
+        int cnt = 0;
         for(int i = 0; i < indexes.size() - 1; i++){
             int start_index = indexes[i];
-            if(i == 0){
-                if(indexes[1] == 1){
-                    printf("Case of same index!\n");
-                    continue;
-                }
-            }
-            int li_start_index = ((start_index) * (start_index - 1) * level)/ 2;
-            int txid_start_index = ((start_index) * (start_index - 1) * NUM_TX)/ 2;
-            int cnt = 0;
-            while(recv_li[li_start_index] != 0 && li_start_index >= prev_index){
+            //int li_start_index = ((start_index) * (start_index - 1) * level)/ 2;
+            int li_start_index = i*level;
+            int txid_start_index = i*NUM_TX;
+            //int txid_start_index = ((start_index) * (start_index - 1) * NUM_TX)/ 2;
+            while(recv_li[li_start_index] != 0){
                 //copy the entry of li and txid
                 vector<int> items;
                 printf("index[%d] = %d, At index: %d\n", i, indexes[i], li_start_index);
@@ -371,12 +369,13 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
                 }
                 litxids_next.push_back(txids);
                 cnt++;
-                li_start_index+=level;
-                txid_start_index+=NUM_TX;
+                li_start_index+=indexes.size()*level;
+                txid_start_index+=indexes.size()*NUM_TX;
             }
             prev_index = li_start_index;
         }
-
+        
+        printf("From CUDA : Level - %d, cnt is: %d\n", level, cnt);
 
 
 
@@ -491,6 +490,7 @@ tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, i
 			cout << "\t";
 		}
 		cout << endl;
+        printf("From NAIVE: level: %d, count is: %d\n", level, li_next.size());
 #endif
 
 	tuple<vector<vector<int>>, long long> ret;
@@ -653,7 +653,7 @@ int main() {
 	out_file << all_freq_itemsets[i] << endl;
 	out_file.close();
 
-	cout << "Total execution time (optimal algorithm) = " << total_time << " us" << endl;
+	cout << "Total execution time (optimal algorithm) = " << total_time/1000000.0 << " us" << endl;
 
 #if NAIVE_METHOD
 	vector<vector<int>> l2_naive;
@@ -736,7 +736,7 @@ int main() {
 	out_file_naive << all_freq_itemsets_naive[i] << endl;
 	out_file_naive.close();
 
-	cout << "Total execution time (naive algorithm) = " << total_time_naive << " us" << endl;
+	cout << "Total execution time (naive algorithm) = " << total_time_naive/1000000.0 << " s" << endl;
 #endif
 
 	return 0;
