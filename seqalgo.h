@@ -14,10 +14,10 @@
 #define DEBUG 0
 #define INFO 1
 
-#define NUM_TX 6
-#define NUM_ITEMS 8
-#define THRESHOLD 2
-#define LEVEL 50
+#define NUM_TX 200
+#define NUM_ITEMS 20
+#define THRESHOLD 10
+#define LEVEL 30
 
 #define NAIVE_METHOD 1
 

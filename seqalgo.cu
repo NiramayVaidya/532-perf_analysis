@@ -233,8 +233,9 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
         
         //convert vector to array - linearizing the vector of vector
         int byteLen_li = sizeof(int) * li.size() * (level-1); // total integers stored in the Itemset vector
-        int * lv_arr = (int *)malloc(byteLen_li);
-
+        int * lv_arr;
+        //int * lv_arr = (int *)malloc(byteLen_li);
+        cudaMallocManaged(&lv_arr, byteLen_li);
         for(int i = 0; i < li.size(); i++){
             for(int j = 0; j < level - 1; j++){
                 int anchor_pt = i*(level-1);
@@ -245,7 +246,9 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
         }
 
         int byteLen_indices = sizeof(int) * indexes.size();
-        int * lv_index_arr = (int*)malloc(byteLen_indices);
+        int * lv_index_arr;
+        //int * lv_index_arr = (int*)malloc(byteLen_indices);
+        cudaMallocManaged(&lv_index_arr, byteLen_indices);
         for(int i = 0; i < indexes.size(); i++){
                 lv_index_arr[i] = indexes[i];
         }
@@ -254,8 +257,9 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 
         //convert set to array - linearizing the vector of set
         int byteLen_txid = sizeof(int) * litxids.size() * (NUM_TX); // total integers stored in set (max)
-        int * lv_arr2 = (int *)malloc(byteLen_txid);
-
+        int * lv_arr2;
+        //int * lv_arr2 = (int *)malloc(byteLen_txid);
+        cudaMallocManaged(&lv_arr2, byteLen_txid);
         for(int i = 0; i < litxids.size(); i++){
             int anchor_pt = i*(NUM_TX);
             for(int j = 0; j < NUM_TX; j++){
@@ -287,6 +291,7 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
         
     */
 
+        /*
         //create the input and output arrays and do cuda malloc
         int *dev_inp_li, *dev_inp_txids, *dev_inp_indices, *dev_out_li, *dev_out_txids;
         cudaMalloc((void**)&dev_inp_li, byteLen_li);
@@ -294,25 +299,33 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
         cudaMalloc((void**)&dev_inp_indices, byteLen_indices);
         //int max_elem = *(std::max_element(indexes.begin(), indexes.end()));
         //printf("maximum element in the index array is: %d\n");
-        int byteLen_li_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * level;
         //int byteLen_li_out = ((max_elem * (max_elem+1)) / 2) * sizeof(int) * level;
-        CUDA_SAFE_CALL(cudaMalloc((void**)&dev_out_li, byteLen_li_out)); // len is decided by max combinations which comes from len of li = (len_li) * (len_li-1) * 0.5
+        for(int x = 0; x < indexes.size(); x++){
+            cudaMalloc((void**)&dev_out_txids, byteLen_txid_out);
+            cudaMalloc((void**)&dev_out_li, byteLen_li_out); // len is decided by max combinations which comes from len of li = (len_li) * (len_li-1) * 0.5
+
+        }*/
+        int byteLen_li_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * level;
         int byteLen_txid_out = ((li.size() * (li.size() - 1)) / 2) * sizeof(int) * NUM_TX;
-        CUDA_SAFE_CALL(cudaMalloc((void**)&dev_out_txids, byteLen_txid_out));
         
-        int * recv_li = (int *)malloc(byteLen_li_out);
-        int * recv_txids = (int *)malloc(byteLen_txid_out);
-        cudaMemcpy(dev_inp_li,lv_arr , byteLen_li, cudaMemcpyHostToDevice);
-        cudaMemcpy(dev_inp_txids, lv_arr2, byteLen_txid, cudaMemcpyHostToDevice);
-        cudaMemcpy(dev_inp_indices, lv_index_arr, byteLen_indices, cudaMemcpyHostToDevice);
+        int * recv_li;
+        //int * recv_li = (int *)malloc(byteLen_li_out);
+        cudaMallocManaged(&recv_li, byteLen_li_out);
+        
+        int * recv_txids;
+        //int * recv_txids = (int *)malloc(byteLen_txid_out);
+        cudaMallocManaged(&recv_txids, byteLen_txid_out);
+        //cudaMemcpy(dev_inp_li,lv_arr , byteLen_li, cudaMemcpyHostToDevice);
+        //cudaMemcpy(dev_inp_txids, lv_arr2, byteLen_txid, cudaMemcpyHostToDevice);
+        //cudaMemcpy(dev_inp_indices, lv_index_arr, byteLen_indices, cudaMemcpyHostToDevice);
 
         int len_indices = indexes.size();
-        printf("Launching kernel!\n");
+        printf("Launching kernel, total eq classes are: %d!\n", len_indices);
         //TODO change total TBs to #eq_classes
-        cuda_compute_li<<<len_indices,1>>>(dev_inp_li, dev_inp_txids, dev_inp_indices, dev_out_li,dev_out_txids, len_indices, NUM_ITEMS,NUM_TX, THRESHOLD,level);
+        cuda_compute_li<<<len_indices,1>>>(lv_arr, lv_arr2, lv_index_arr, recv_li,recv_txids, len_indices, NUM_ITEMS,NUM_TX, THRESHOLD,level);
         cudaDeviceSynchronize();
-        cudaMemcpy(recv_li, dev_out_li, byteLen_li_out, cudaMemcpyDeviceToHost);
-        cudaMemcpy(recv_txids, dev_out_txids,byteLen_txid_out, cudaMemcpyDeviceToHost);
+        //cudaMemcpy(recv_li, dev_out_li, byteLen_li_out, cudaMemcpyDeviceToHost);
+        //cudaMemcpy(recv_txids, dev_out_txids,byteLen_txid_out, cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
 
 
@@ -376,7 +389,11 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
         }
         
         printf("From CUDA : Level - %d, cnt is: %d\n", level, cnt);
-
+        cudaFree(lv_arr);
+        cudaFree(lv_index_arr);
+        cudaFree(lv_arr2);
+        cudaFree(recv_li);
+        cudaFree(recv_txids);
 
 
         
@@ -451,6 +468,8 @@ tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, i
 		}
 	}
 	indexes.push_back(li.size());
+    
+    printf("From NAIVE: index len is: %d\n", indexes.size());
 
 	vector<vector<int>> li_next;
 	for (int i = 0; i < indexes.size() - 1; i++) {
