@@ -204,7 +204,11 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 			int* eq_class_txids; // linear array while litxids is 2D
 			cudaMallocManaged(&eq_class_li, byteLen_eq_class * (level - 1));
 			cudaMallocManaged(&eq_class_txids, byteLen_eq_class * (NUM_TX));
-			//printf("Level %d, EQ class : %d, Length of eq class is: %d\n", level, i, len_eq_class);
+			
+            
+            int device = -1;
+            cudaGetDevice(&device);
+                        //printf("Level %d, EQ class : %d, Length of eq class is: %d\n", level, i, len_eq_class);
 			//preparing the data to send to GPU
 			for(int j = 0; j < len_eq_class; j++){
 				int anchor_pt_li = j * (level - 1);
@@ -224,6 +228,9 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 					cnt++;
 				}
 			}
+            cudaMemPrefetchAsync(eq_class_li,byteLen_eq_class * (level - 1), device, NULL);
+            cudaMemPrefetchAsync(eq_class_txids, byteLen_eq_class * (NUM_TX), device, NULL);
+
 			int * recv_li;
 			int * recv_txids;
 			int byteLen_li_out = max_candidates * sizeof(int) * level;
@@ -239,6 +246,8 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 					recv_txids[j*NUM_TX + x] = -1;
 				}
 			}
+            cudaMemPrefetchAsync(recv_li,byteLen_li_out, device, NULL);
+            cudaMemPrefetchAsync(recv_txids,byteLen_txid_out, device, NULL);
 
 			//launch the kernel
 			cuda_compute_li<<<max_candidates,1>>>(eq_class_li, eq_class_txids, recv_li,recv_txids, len_eq_class, NUM_ITEMS,NUM_TX, THRESHOLD,level);
@@ -570,7 +579,7 @@ int main() {
 	out_file << all_freq_itemsets[i] << endl;
 	out_file.close();
 
-	cout << "Total execution time (optimal algorithm) = " << total_time << " us" << endl;
+	cout << "Total execution time (optimal algorithm) = " << total_time/float(1000000) << " s" << endl;
 
 #if NAIVE_METHOD
 	vector<vector<int>> l2_naive;
@@ -653,7 +662,7 @@ int main() {
 	out_file_naive << all_freq_itemsets_naive[i] << endl;
 	out_file_naive.close();
 
-	cout << "Total execution time (naive algorithm) = " << total_time_naive << " us" << endl;
+	cout << "Total execution time (naive algorithm) = " << total_time_naive/float(1000000) << " s" << endl;
 #endif
 
 	return 0;
