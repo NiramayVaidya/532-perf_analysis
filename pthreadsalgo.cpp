@@ -447,98 +447,100 @@ void pthreadsalgo_run(entry *dataset) {
 
 	// cout << "l2 computation done" << endl;
 
+	if (l2.size() >= 1) {
 #if DEBUG
-	cout << "Reformed dataset ->" << endl;
-	for (int i = 0; i < newdb.size(); i++) {
-		cout << l2[i][0] << " " << l2[i][1] << " = ";
-		set<int>::iterator it;
-		for (it = newdb[i].begin(); it != newdb[i].end(); it++) {
-			cout << *it << " ";
+		cout << "Reformed dataset ->" << endl;
+		for (int i = 0; i < newdb.size(); i++) {
+			cout << l2[i][0] << " " << l2[i][1] << " = ";
+			set<int>::iterator it;
+			for (it = newdb[i].begin(); it != newdb[i].end(); it++) {
+				cout << *it << " ";
+			}
+			cout << endl;
 		}
-		cout << endl;
-	}
 #endif
 
-	vector<int> indexes;
-	int offset = 0;
+		vector<int> indexes;
+		int offset = 0;
 
-	start = std::chrono::high_resolution_clock::now();
+		start = std::chrono::high_resolution_clock::now();
 
-	indexes.push_back(0);
-	for (int i = 0; i < l2.size() - 1; i++) {
-		bool all_same = true;
-		for (int j = 0; j <= offset; j++) {
-			if (l2[i][j] != l2[i + 1][j]) {
-				all_same = false;
-				break;
+		indexes.push_back(0);
+		for (int i = 0; i < l2.size() - 1; i++) {
+			bool all_same = true;
+			for (int j = 0; j <= offset; j++) {
+				if (l2[i][j] != l2[i + 1][j]) {
+					all_same = false;
+					break;
+				}
+			}
+			if (!all_same) {
+				indexes.push_back(i + 1);
 			}
 		}
-		if (!all_same) {
-			indexes.push_back(i + 1);
+		indexes.push_back(l2.size());
+
+		elapsed = std::chrono::high_resolution_clock::now() - start;
+		total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+		total_time_seq = total_time;
+
+		vector<pthread_t> tids(indexes.size() - 1);
+
+		pthread_mutex_init(&lock, NULL);
+
+	// #if DEBUG
+		cout << "Thread count = " << tids.size() << endl;
+	// #endif
+
+#if USE_CPU_AFFINITY
+		int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+	// #if DEBUG
+		cout << "Available cores = " << num_cores << endl;
+	// #endif
+
+		pthread_attr_t attr;
+		cpu_set_t cpus;
+		pthread_attr_init(&attr);
+#endif
+
+		start = std::chrono::high_resolution_clock::now();
+
+		for (int i = 0; i < tids.size(); i++) {
+			equivalence_class_indexes eci;
+			eci.start = indexes[i];
+			eci.end = indexes[i + 1];
+			eci.offset = offset;
+			ecis.push_back(eci);
 		}
-	}
-	indexes.push_back(l2.size());
 
-	elapsed = std::chrono::high_resolution_clock::now() - start;
-	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-	total_time_seq = total_time;
-
-	vector<pthread_t> tids(indexes.size() - 1);
-
-	pthread_mutex_init(&lock, NULL);
-
-// #if DEBUG
-	cout << "Thread count = " << tids.size() << endl;
-// #endif
-
-#if USE_CPU_AFFINITY
-	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-// #if DEBUG
-	cout << "Available cores = " << num_cores << endl;
-// #endif
-
-	pthread_attr_t attr;
-	cpu_set_t cpus;
-	pthread_attr_init(&attr);
-#endif
-
-	start = std::chrono::high_resolution_clock::now();
-
-	for (int i = 0; i < tids.size(); i++) {
-		equivalence_class_indexes eci;
-		eci.start = indexes[i];
-		eci.end = indexes[i + 1];
-		eci.offset = offset;
-		ecis.push_back(eci);
-	}
-
-	for (int i = 0; i < tids.size(); i++) {
+		for (int i = 0; i < tids.size(); i++) {
 #if DEBUG
-		cout << "Start index = " << ecis[i].start << ", end index = " << ecis[i].end << endl;
+			cout << "Start index = " << ecis[i].start << ", end index = " << ecis[i].end << endl;
 #endif
-		long pos = (long) i;
+			long pos = (long) i;
 
 #if USE_CPU_AFFINITY
-		CPU_ZERO(&cpus);
-		CPU_SET(i % num_cores, &cpus);
-		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+			CPU_ZERO(&cpus);
+			CPU_SET(i % num_cores, &cpus);
+			pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
 #endif
 
 #if USE_CPU_AFFINITY
-		pthread_create(&tids[i], &attr, launch_compute, (void *) pos);
+			pthread_create(&tids[i], &attr, launch_compute, (void *) pos);
 #else
-		pthread_create(&tids[i], NULL, launch_compute, (void *) pos);
+			pthread_create(&tids[i], NULL, launch_compute, (void *) pos);
 #endif
-	}
-	
-	for (int i = 0; i < tids.size(); i++) {
-		pthread_join(tids[i], NULL);
-	}
+		}
+		
+		for (int i = 0; i < tids.size(); i++) {
+			pthread_join(tids[i], NULL);
+		}
 
-	elapsed = std::chrono::high_resolution_clock::now() - start;
-	total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+		elapsed = std::chrono::high_resolution_clock::now() - start;
+		total_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
-	pthread_mutex_destroy(&lock);
+		pthread_mutex_destroy(&lock);
+	}
 
 	fstream out_file;
 	out_file.open(output_file, fstream::out | fstream::trunc);
@@ -609,76 +611,78 @@ void pthreadsalgo_run(entry *dataset) {
 	}
 	cout << endl;
 #endif
-	
-	vector<int> indexes_naive;
-	offset = 0;
 
-	start = std::chrono::high_resolution_clock::now();
+	if (l2.size() >= 1) {
+		vector<int> indexes_naive;
+		int offset = 0;
 
-	indexes_naive.push_back(0);
-	for (int i = 0; i < l2_naive.size() - 1; i++) {
-		bool all_same = true;
-		for (int j = 0; j <= offset; j++) {
-			if (l2[i][j] != l2[i + 1][j]) {
-				all_same = false;
-				break;
+		start = std::chrono::high_resolution_clock::now();
+
+		indexes_naive.push_back(0);
+		for (int i = 0; i < l2_naive.size() - 1; i++) {
+			bool all_same = true;
+			for (int j = 0; j <= offset; j++) {
+				if (l2[i][j] != l2[i + 1][j]) {
+					all_same = false;
+					break;
+				}
+			}
+			if (!all_same) {
+				indexes_naive.push_back(i + 1);
 			}
 		}
-		if (!all_same) {
-			indexes_naive.push_back(i + 1);
+		indexes_naive.push_back(l2.size());
+
+		elapsed = std::chrono::high_resolution_clock::now() - start;
+		total_time_naive += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+
+		vector<pthread_t> tids_naive(indexes_naive.size() - 1);
+
+		pthread_mutex_init(&lock, NULL);
+
+		start = std::chrono::high_resolution_clock::now();
+
+	// #if DEBUG
+		cout << "Thread count = " << tids_naive.size() << endl;
+	// #endif
+
+		ecis.clear();
+		for (int i = 0; i < tids_naive.size(); i++) {
+			equivalence_class_indexes eci;
+			eci.start = indexes_naive[i];
+			eci.end = indexes_naive[i + 1];
+			eci.offset = offset;
+			ecis.push_back(eci);
 		}
-	}
-	indexes_naive.push_back(l2.size());
 
-	elapsed = std::chrono::high_resolution_clock::now() - start;
-	total_time_naive += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-
-	vector<pthread_t> tids_naive(indexes_naive.size() - 1);
-
-	pthread_mutex_init(&lock, NULL);
-
-	start = std::chrono::high_resolution_clock::now();
-
-// #if DEBUG
-	cout << "Thread count = " << tids_naive.size() << endl;
-// #endif
-
-	ecis.clear();
-	for (int i = 0; i < tids.size(); i++) {
-		equivalence_class_indexes eci;
-		eci.start = indexes[i];
-		eci.end = indexes[i + 1];
-		eci.offset = offset;
-		ecis.push_back(eci);
-	}
-
-	for (int i = 0; i < tids_naive.size(); i++) {
+		for (int i = 0; i < tids_naive.size(); i++) {
 #if DEBUG
-		cout << "Start index = " << ecis[i].start << ", end index = " << ecis[i].end << endl;
+			cout << "Start index = " << ecis[i].start << ", end index = " << ecis[i].end << endl;
 #endif
-		long pos = (long) i;
+			long pos = (long) i;
 
 #if USE_CPU_AFFINITY
-		CPU_ZERO(&cpus);
-		CPU_SET(i % num_cores, &cpus);
-		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+			CPU_ZERO(&cpus);
+			CPU_SET(i % num_cores, &cpus);
+			pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
 #endif
 
 #if USE_CPU_AFFINITY
-		pthread_create(&tids_naive[i], &attr, launch_compute_naive, (void *) pos);
+			pthread_create(&tids_naive[i], &attr, launch_compute_naive, (void *) pos);
 #else
-		pthread_create(&tids_naive[i], NULL, launch_compute_naive, (void *) pos);
+			pthread_create(&tids_naive[i], NULL, launch_compute_naive, (void *) pos);
 #endif
-	}
-	
-	for (int i = 0; i < tids_naive.size(); i++) {
-		pthread_join(tids_naive[i], NULL);
-	}
+		}
+		
+		for (int i = 0; i < tids_naive.size(); i++) {
+			pthread_join(tids_naive[i], NULL);
+		}
 
-	elapsed = std::chrono::high_resolution_clock::now() - start;
-	total_time_naive += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+		elapsed = std::chrono::high_resolution_clock::now() - start;
+		total_time_naive += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
-	pthread_mutex_destroy(&lock);
+		pthread_mutex_destroy(&lock);
+	}
 
 	fstream out_file_naive;
 	out_file_naive.open(output_file_naive, fstream::out | fstream::trunc);
