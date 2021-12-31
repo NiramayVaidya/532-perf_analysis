@@ -1,9 +1,9 @@
 #include "dataset.h"
 
-#define DEBUG 0
+#define DEBUG 1
 
-#define NUM_TX 1000
-#define NUM_ITEMS 30
+#define NUM_TX 500
+#define NUM_ITEMS 50
 
 #define LOAD_DB 0
 
