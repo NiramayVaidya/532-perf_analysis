@@ -488,15 +488,15 @@ void pthreadsalgo_run(entry *dataset) {
 
 		pthread_mutex_init(&lock, NULL);
 
-	// #if DEBUG
+// #if DEBUG
 		cout << "Thread count = " << tids.size() << endl;
-	// #endif
+// #endif
 
 #if USE_CPU_AFFINITY
 		int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-	// #if DEBUG
+// #if DEBUG
 		cout << "Available cores = " << num_cores << endl;
-	// #endif
+// #endif
 
 		pthread_attr_t attr;
 		cpu_set_t cpus;
@@ -640,11 +640,19 @@ void pthreadsalgo_run(entry *dataset) {
 
 		pthread_mutex_init(&lock, NULL);
 
-		start = std::chrono::high_resolution_clock::now();
-
-	// #if DEBUG
+// #if DEBUG
 		cout << "Thread count = " << tids_naive.size() << endl;
-	// #endif
+// #endif
+
+#if USE_CPU_AFFINITY
+		int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+
+		pthread_attr_t attr;
+		cpu_set_t cpus;
+		pthread_attr_init(&attr);
+#endif
+
+		start = std::chrono::high_resolution_clock::now();
 
 		ecis.clear();
 		for (int i = 0; i < tids_naive.size(); i++) {

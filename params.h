@@ -6,10 +6,10 @@
 #define DEBUG 0
 #define INFO 0
 
-#define NUM_TX 1000
-#define NUM_ITEMS 30
-#define THRESHOLD 10
-#define LEVEL 30
+#define NUM_TX 100
+#define NUM_ITEMS 50
+#define THRESHOLD 20
+#define LEVEL 50
 
 #define USE_CPU_AFFINITY 0
 

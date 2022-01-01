@@ -1,9 +1,9 @@
 #include "seqalgo.h"
 #include "pthreadsalgo.h"
 
-#define LOAD_DB 0
+#define LOAD_DB 1
 
-string load_file = "dataset.txt";
+string load_file = "datasets/varying_probability/dataset_100_50_70.txt";
 
 int main(int argc, char *argv[]) {
 	entry *data = (entry *) malloc(NUM_TX * sizeof(entry));
