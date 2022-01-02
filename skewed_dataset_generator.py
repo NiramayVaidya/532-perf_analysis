@@ -1,9 +1,12 @@
-num_tx = 100
-num_items = 100
+# num_tx = 100
+# num_items = 100
+num_tx = 50
+num_items = 50
 
 # lower triangular matrix
 def gen_variant_1():
-    with open('datasets/varying_num_items/dataset_100_100_50_variant_1.txt', 'w') as f:
+    # with open('datasets/varying_num_items/dataset_100_100_50_variant_1.txt', 'w') as f:
+    with open('datasets/varying_num_tx/dataset_50_50_50_variant_1.txt', 'w') as f:
         tx_rows = []
         count = 0
         for i in range(0, num_tx):
@@ -16,7 +19,8 @@ def gen_variant_1():
 
 # step distribution
 def gen_variant_2():
-    with open('datasets/varying_num_items/dataset_100_100_50_variant_2.txt', 'w') as f:
+    # with open('datasets/varying_num_items/dataset_100_100_50_variant_2.txt', 'w') as f:
+    with open('datasets/varying_num_tx/dataset_50_50_50_variant_2.txt', 'w') as f:
         tx_rows = []
         count = 0
         for i in range(0, num_tx):
@@ -40,10 +44,24 @@ def gen_variant_2():
 
 # gaussian/normal distribution
 def gen_variant_3():
-    with open('datasets/varying_num_items/dataset_100_100_50_variant_3.txt', 'w') as f:
+    # with open('datasets/varying_num_items/dataset_100_100_50_variant_3.txt', 'w') as f:
+    with open('datasets/varying_num_tx/dataset_50_50_50_variant_3.txt', 'w') as f:
         tx_rows = []
         count = 0
-        for i in range(0, num_tx):
+        # for i in range(0, num_tx):
+        offset = num_tx
+        for i in range(int(num_tx / 2), -1, -1):
+            if i >= 15:
+                tx_rows.append((['1'] * offset) + (['0'] * (num_tx - offset)))
+                count += offset
+                offset -= 1
+            else:
+                tx_rows.append((['1'] * offset) + (['0'] * (num_tx - offset)))
+                count += offset
+                offset -= 3
+            if offset < 0:
+                offset = 0
+            '''
             if (i + 1) * 3 <= (num_items * 0.75):
                 tx_rows.append((['1'] * ((i + 1) * 3)) + (['0'] * (num_items - ((i + 1) * 3))))
                 count += ((i + 1) * 3)
@@ -52,21 +70,40 @@ def gen_variant_3():
                 count += ((num_items * 0.5) + i + 1)
             if (i + 1) > (num_items * 0.5):
                 break
-        tx_rows_reverse = tx_rows[:len(tx_rows) - 1][::-1]
-        tx_rows += tx_rows_reverse
+            '''
+        # tx_rows_reverse = tx_rows[:len(tx_rows) - 1][::-1]
+        # tx_rows += tx_rows_reverse
+        tx_rows_reverse = tx_rows[1:][::-1]
+        tx_rows = tx_rows_reverse + tx_rows
         count *= 2
         count -= num_items
-        for tx_row in tx_rows:
+        # for tx_row in tx_rows:
+        for tx_row in tx_rows[:len(tx_rows) - 2]:
             f.write(' '.join(tx_row) + '\n')
+        # f.write(' '.join(tx_row[-2]) + '\n')
         f.write(' '.join(['0'] * num_items))
         print('Validating distribution of values: ' + str(int(count)) + ' / ' + str(num_tx * num_items))
 
 # exponential distribution
 def gen_variant_4():
-    with open('datasets/varying_num_items/dataset_100_100_50_variant_4.txt', 'w') as f:
+    # with open('datasets/varying_num_items/dataset_100_100_50_variant_4.txt', 'w') as f:
+    with open('datasets/varying_num_tx/dataset_50_50_50_variant_4.txt', 'w') as f:
         tx_rows = []
         count = 0
-        for i in range(0, num_tx):
+        # for i in range(0, num_tx):
+        offset = num_tx
+        for i in range(int(num_tx / 2), -1, -1):
+            if i >= 15:
+                tx_rows.append((['1'] * offset) + (['0'] * (num_tx - offset)))
+                count += offset
+                offset -= 3
+            else:
+                tx_rows.append((['1'] * offset) + (['0'] * (num_tx - offset)))
+                count += offset
+                offset -= 1
+            if offset < 0:
+                offset = 0
+            '''
             if (i + 1) <= (num_items * 0.25):
                 tx_rows.append((['1'] * (i + 1)) + (['0'] * (num_items - (i + 1))))
                 count += i + 1
@@ -77,19 +114,25 @@ def gen_variant_4():
                 count += offset
             if (i + 1) > (num_items * 0.5):
                 break
-        tx_rows_reverse = tx_rows[:len(tx_rows) - 1][::-1]
-        tx_rows += tx_rows_reverse
+            '''
+        # tx_rows_reverse = tx_rows[:len(tx_rows) - 1][::-1]
+        # tx_rows += tx_rows_reverse
+        tx_rows_reverse = tx_rows[1:][::-1]
+        tx_rows = tx_rows_reverse + tx_rows
         count *= 2
         count -= num_items
-        for tx_row in tx_rows:
+        # for tx_row in tx_rows:
+        for tx_row in tx_rows[:len(tx_rows) - 2]:
             f.write(' '.join(tx_row) + '\n')
-        f.write(' '.join(['0'] * num_items))
+        f.write(' '.join(['1'] * 4) + ' ' + ' '.join(['0'] * (num_items - 4)))
+        count += 4
+        # f.write(' '.join(['0'] * num_items))
         print('Validating distribution of values: ' + str(int(count)) + ' / ' + str(num_tx * num_items))
 
 def main():
-    # gen_variant_1() 
-    # gen_variant_2()
-    # gen_variant_3()
+    gen_variant_1() 
+    gen_variant_2()
+    gen_variant_3()
     gen_variant_4()
 
 if __name__ == '__main__':
