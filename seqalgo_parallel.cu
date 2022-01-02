@@ -6,6 +6,9 @@ using namespace std;
 string output_file = "frequent_itemsets.txt";
 string output_file_naive = "frequent_itemsets_naive.txt";
 
+long long cuda_time = 0;
+long long preprocess_time = 0;
+long long seq_compute_time = 0;
 __global__ void cuda_compute_li(int *dev_inp_li, int *dev_inp_txids, int *dev_out_li, int *dev_out_txids, int len_eq_class, int total_items, int total_tx, int Th, int level)
 {
     int id = blockDim.x * blockIdx.x + threadIdx.x; // tid
@@ -194,17 +197,23 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 		}
 		printf("\n");
 	}*/
-
+    
 	for (int i = 0; i < indexes.size() - 1; i++) {
 		int len_eq_class = indexes[i+1] - indexes[i];
 		int max_candidates = ((len_eq_class * (len_eq_class - 1)) / 2);
 		if(max_candidates > 0){
-			int byteLen_eq_class = sizeof(int) * len_eq_class;
+			
+            
+	        auto preprocess_start = std::chrono::high_resolution_clock::now();
+            int byteLen_eq_class = sizeof(int) * len_eq_class;
 			int* eq_class_li; // linear array while li is 2D
 			int* eq_class_txids; // linear array while litxids is 2D
+            //printf("Let's start the computation part! \n");
 			cudaMallocManaged(&eq_class_li, byteLen_eq_class * (level - 1));
+            //printf("malloc - Let's start the computation part! \n");
 			cudaMallocManaged(&eq_class_txids, byteLen_eq_class * (NUM_TX));
 			
+            //printf("Let's start the computation part! \n");
             
             int device = -1;
             cudaGetDevice(&device);
@@ -248,10 +257,21 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 			}
             cudaMemPrefetchAsync(recv_li,byteLen_li_out, device, NULL);
             cudaMemPrefetchAsync(recv_txids,byteLen_txid_out, device, NULL);
+            
+            auto preprocess_elapsed = std::chrono::high_resolution_clock::now() - preprocess_start;
+            preprocess_time += std::chrono::duration_cast<std::chrono::microseconds>(preprocess_elapsed).count();
 
+
+	        auto cuda_start = std::chrono::high_resolution_clock::now();
 			//launch the kernel
-			cuda_compute_li<<<max_candidates,1>>>(eq_class_li, eq_class_txids, recv_li,recv_txids, len_eq_class, NUM_ITEMS,NUM_TX, THRESHOLD,level);
+			int tb_size = 128;
+            int num_tb = (max_candidates + tb_size - 1)/tb_size;
+            //printf("Launching kernel for level %d\n", level);
+            cuda_compute_li<<<num_tb,tb_size>>>(eq_class_li, eq_class_txids, recv_li,recv_txids, len_eq_class, NUM_ITEMS,NUM_TX, THRESHOLD,level);
 			cudaDeviceSynchronize();
+
+	        auto cuda_elapsed = std::chrono::high_resolution_clock::now() - cuda_start;
+            cuda_time += std::chrono::duration_cast<std::chrono::microseconds>(cuda_elapsed).count();
 
 			//put the GPU computed data into li_next and litxids_next
 			//printf("max_candidates are: %d, Got this from the GPU: \n", max_candidates);
@@ -268,6 +288,9 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 					}
 				printf("\n");
 			} */
+            
+            preprocess_start = std::chrono::high_resolution_clock::now();
+
 
 			for(int j = 0; j < max_candidates; j++){
 				if(recv_li[j*level] != 0){
@@ -295,6 +318,10 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 			cudaFree(eq_class_txids);
 			cudaFree(recv_li);
 			cudaFree(recv_txids);
+            
+            preprocess_elapsed = std::chrono::high_resolution_clock::now() - preprocess_start;
+            preprocess_time += std::chrono::duration_cast<std::chrono::microseconds>(preprocess_elapsed).count();
+
 
 
 		}
@@ -317,6 +344,7 @@ tuple<vector<vector<int>>, vector<set<int>>, long long> compute_li(vector<vector
 		}
 	}*/
 	
+    
 	auto elapsed = std::chrono::high_resolution_clock::now() - start;
 	time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
@@ -378,8 +406,9 @@ tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, i
 		printf("Level: %d, Eq class %d has elements: %d\n", level, i, indexes[i+1] - indexes[i]);
 	}
 	*/
-
-	vector<vector<int>> li_next;
+    auto start_compute = std::chrono::high_resolution_clock::now();
+	
+    vector<vector<int>> li_next;
 	for (int i = 0; i < indexes.size() - 1; i++) {
 		for (int j = indexes[i]; j < indexes[i + 1] - 1; j++) {
 			for (int k = j + 1; k <= indexes[i + 1] - 1; k++) {
@@ -405,6 +434,10 @@ tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, i
 		}
 	}
 	
+    auto elapsed_compute = std::chrono::high_resolution_clock::now() - start_compute;
+    seq_compute_time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed_compute).count();
+
+
 	auto elapsed = std::chrono::high_resolution_clock::now() - start;
 	time += std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
@@ -427,9 +460,10 @@ tuple<vector<vector<int>>, long long> compute_li_naive(vector<vector<int>> li, i
 
 int main() {
 	entry *db = (entry *) malloc(NUM_TX * sizeof(entry));
-
-	generate_dataset(db, NUM_TX, NUM_ITEMS);
-
+    string load_file = "./datasets/varying_probability/dataset_100_50_80.txt";
+	//generate_dataset(db, NUM_TX, NUM_ITEMS);
+    load_dataset(db, NUM_TX, NUM_ITEMS, load_file);
+    printf("value of threshold is: %d\n",THRESHOLD );
 #if DEBUG
 	print_dataset(db);
 #endif
@@ -580,6 +614,8 @@ int main() {
 	out_file.close();
 
 	cout << "Total execution time (optimal algorithm) = " << total_time/float(1000000) << " s" << endl;
+	cout << "\t ###### CUDA execution time (optimal algorithm) = " << cuda_time/float(1000000) << " s" << endl;
+	cout << "\t ###### Preprocessing time (optimal algorithm) = " << preprocess_time/float(1000000) << " s" << endl;
 
 #if NAIVE_METHOD
 	vector<vector<int>> l2_naive;
@@ -663,6 +699,7 @@ int main() {
 	out_file_naive.close();
 
 	cout << "Total execution time (naive algorithm) = " << total_time_naive/float(1000000) << " s" << endl;
+	cout << "Compute execution time (naive algorithm) = " << seq_compute_time/float(1000000) << " s" << endl;
 #endif
 
 	return 0;
